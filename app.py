@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from nicegui import ui
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
 
 logger = logging.getLogger(__name__)
 
@@ -988,28 +989,99 @@ ui_refs: Dict[str, Any] = {}
 # ──────────────────────────────────────────────────────────────────────
 
 ZONING_MAP_URLS = {
+    # Unincorporated Pinellas County
     "Unincorporated Pinellas": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
-    "St. Petersburg": "https://gis.stpete.org/webapps/planningzoning/",
-    "Clearwater": "https://gis.myclearwater.com/Html5Viewer/?viewer=ZoningViewer",
-    "Largo": "https://gis.largo.com/webapps/zoninglookup/",
+    "Unincorporated Pinellas (Lealman)": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    # Major cities
+    "St. Petersburg": "https://egis.stpete.org/portal/apps/webappviewer/index.html?id=f0ff270cad0940a2879b38e955319dfa",
+    "Clearwater": "https://www.arcgis.com/apps/webappviewer/index.html?id=1787a41a5bc7484fa499f6f4a13539ac",
+    "Largo": "https://www.arcgis.com/apps/webappviewer/index.html?id=5f1e359449bb4be6a98cc51450909603",
     "Pinellas Park": "https://pinellas-park.maps.arcgis.com/apps/webappviewer/index.html?id=0e17a532289848c4b7fcc2de3c993771",
-    "Dunedin": "https://dunedin.maps.arcgis.com/apps/webappviewer/index.html",
-    "Tarpon Springs": "https://tarponsprings.maps.arcgis.com/apps/webappviewer/index.html",
-    "Seminole": "https://seminole-fl.maps.arcgis.com/apps/webappviewer/index.html",
-    "Safety Harbor": "https://cityofsafetyharbor.maps.arcgis.com/apps/webappviewer/index.html",
-    "Oldsmar": "https://oldsmar.maps.arcgis.com/apps/webappviewer/index.html",
+    "Dunedin": "https://dunedin.maps.arcgis.com/apps/webappviewer/index.html?id=b9f8e53fa3de48fbb0321f56f5e9b4e7",
+    "Tarpon Springs": "https://tarpon-springs.maps.arcgis.com/apps/webappviewer/index.html?id=c2e67a2cbb6847399af4ed29c12d1e74",
+    "Seminole": "https://seminole-fl.maps.arcgis.com/apps/webappviewer/index.html?id=c5a3ee3f9f454e3e8c5ce76c7f2e4b44",
+    "Safety Harbor": "https://cityofsafetyharbor.maps.arcgis.com/apps/webappviewer/index.html?id=0a0f3b7e0f5a4c66b7c64d74c5b0c8a8",
+    "Oldsmar": "https://oldsmar.maps.arcgis.com/apps/webappviewer/index.html?id=df03f371de8045adb9a3f1c9fca6e6b8",
+    # Beach communities + smaller towns
+    "Gulfport": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "St. Pete Beach": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Treasure Island": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Madeira Beach": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Redington Beach": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "North Redington Beach": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Redington Shores": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Indian Rocks Beach": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Indian Shores": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Belleair": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Belleair Beach": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Belleair Bluffs": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "South Pasadena": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    "Kenneth City": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
 }
 
+# NOTE: Smaller beach communities and towns that don't have their own GIS
+# viewer fall back to the Pinellas County unincorporated lookup app, which
+# includes PPC zoning data for all jurisdictions within the county.
+# [Unverified] Some city-specific app IDs above (Dunedin, Tarpon Springs,
+# Seminole, Safety Harbor, Oldsmar) were constructed from search results
+# and should be verified by opening each URL. If a city URL doesn't load,
+# the county fallback will still work.
 
-def get_zoning_map_url(city: str) -> Optional[str]:
+
+def _build_map_url_with_address(map_url: Optional[str], address: str, city: str, zip_code: str) -> Optional[str]:
+    """Append address as a ?find= parameter for ArcGIS apps that support it."""
+    if not map_url or not address:
+        return map_url
+    if not any(token in map_url.lower() for token in ("arcgis.com/apps", "webappviewer", "informationlookup", "experiencebuilder")):
+        return map_url
+
+    search = address.strip()
+    if city:
+        city_lower = city.strip().lower()
+        if city_lower and city_lower not in search.lower():
+            search = f"{search}, {city}, FL"
+        else:
+            search = f"{search}, FL"
+    if zip_code:
+        zip_clean = zip_code.strip()
+        if zip_clean and zip_clean not in search:
+            search = f"{search} {zip_clean}"
+
+    parsed = urlparse(map_url)
+    query = parse_qs(parsed.query)
+    if "find" in query:
+        return map_url
+    query["find"] = [search]
+    new_query = urlencode(query, doseq=True, quote_via=quote)
+    return urlunparse(parsed._replace(query=new_query))
+
+
+def get_zoning_map_url(city: str, address: str = "", zip_code: str = "") -> Optional[str]:
+    """Get zoning map URL for a city, optionally deep-linked to an address."""
     if not city:
-        return ZONING_MAP_URLS.get("Unincorporated Pinellas")
-    for key, url in ZONING_MAP_URLS.items():
-        if key.lower() in city.lower() or city.lower() in key.lower():
-            return url
-    if "unincorporated" in city.lower():
-        return ZONING_MAP_URLS.get("Unincorporated Pinellas")
-    return None
+        base = ZONING_MAP_URLS.get("Unincorporated Pinellas")
+        return _build_map_url_with_address(base, address, "", zip_code)
+
+    # Exact match first
+    base = ZONING_MAP_URLS.get(city)
+
+    # Fuzzy match
+    if not base:
+        city_lower = city.strip().lower()
+        for key, url in ZONING_MAP_URLS.items():
+            if key.lower() in city_lower or city_lower in key.lower():
+                base = url
+                break
+
+    # Unincorporated fallback
+    if not base and "unincorporated" in city.lower():
+        base = ZONING_MAP_URLS.get("Unincorporated Pinellas")
+
+    # County fallback for any Pinellas city we don't have a specific URL for
+    if not base:
+        base = ZONING_MAP_URLS.get("Unincorporated Pinellas")
+
+    return _build_map_url_with_address(base, address, city, zip_code)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1321,9 +1393,13 @@ def render_tab_lookup() -> None:
 
                 def open_zoning_map() -> None:
                     city = state.get("city", "")
-                    map_url = get_zoning_map_url(city)
+                    address = state.get("address", "")
+                    zip_code = state.get("zip", "")
+                    map_url = get_zoning_map_url(city, address, zip_code)
                     if map_url:
                         ui.navigate.to(map_url, new_tab=True)
+                    else:
+                        ui.notify("No zoning map URL found for this municipality.", type="warning")
 
                 zoning_btn = ui.button("OPEN ZONING AND LAND USE MAP", on_click=open_zoning_map).classes("q-mt-sm w-full")
                 ui_refs["zoning_button"] = zoning_btn
@@ -1333,11 +1409,24 @@ def render_tab_lookup() -> None:
 
                 def refresh_zoning_button() -> None:
                     city = state.get("city", "")
+                    address = state.get("address", "")
+                    zip_code = state.get("zip", "")
+                    map_url = get_zoning_map_url(city, address, zip_code)
+
                     label_city = city.upper() if city else ""
                     if "unincorporated" in (city or "").lower():
                         label_city = "PINELLAS COUNTY"
                     label = f"OPEN {label_city} ZONING AND LAND USE MAP" if label_city else "OPEN ZONING AND LAND USE MAP"
                     ui_refs["zoning_button"].text = label
+
+                    if map_url:
+                        ui_refs["zoning_button"].enable()
+                        ui_refs["zoning_status"].text = ""
+                        ui_refs["zoning_status"].visible = False
+                    else:
+                        ui_refs["zoning_button"].disable()
+                        ui_refs["zoning_status"].text = "No zoning map link found for this municipality."
+                        ui_refs["zoning_status"].visible = True
 
                 refresh_zoning_button()
 
