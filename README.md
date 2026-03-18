@@ -11,12 +11,76 @@ designed to scale to additional counties.
 
 ---
 
+## ⬇️ Get the Code — Download or Clone
+
+There are two ways to get all of these files onto your computer.
+
+---
+
+### Option A — Download as a ZIP (no Git required — easiest)
+
+1. Go to the repository on GitHub:
+   **<https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2>**
+
+2. Click the green **`<> Code`** button near the top-right of the file list.
+
+3. Click **"Download ZIP"** from the dropdown.
+
+4. Open the downloaded `.zip` file and **extract** it to a folder on your computer
+   (e.g. `C:\Users\You\Documents\Site-Data-Analysis-2` on Windows).
+
+5. Open a terminal / Command Prompt **inside that extracted folder**, then follow
+   the [Quick Start](#quick-start) steps below to install dependencies and run the app.
+
+> **Note:** To get the full modular version (with `agents/`, `tools/`, `data/` folders)
+> you need to download from the **`copilot/refactor-app-into-modular-architecture`** branch:
+>
+> 1. Click **`<> Code`** → **"Download ZIP"**
+>    — OR use this direct link: [Download ZIP of this branch](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/archive/refs/heads/copilot/refactor-app-into-modular-architecture.zip)
+> 2. Extract and open a terminal in the extracted folder.
+> 3. Follow [Quick Start](#quick-start) below.
+
+---
+
+### Option B — Clone with Git (recommended)
+
+Git lets you pull updates with a single command in the future.
+
+**Step 1 — Install Git** (skip if you already have it)
+
+| OS | Installer |
+|---|---|
+| Windows | <https://git-scm.com/download/win> — run the installer, accept all defaults |
+| macOS | Open Terminal and type `git --version` — macOS will offer to install it automatically |
+| Linux | `sudo apt install git` (Debian/Ubuntu) or `sudo dnf install git` (Fedora) |
+
+**Step 2 — Clone the repository**
+
+Open a terminal (Git Bash on Windows) and run:
+
+```bash
+git clone https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2.git
+cd Site-Data-Analysis-2
+```
+
+This downloads all files into a folder called `Site-Data-Analysis-2`.
+
+**Step 3 — Switch to the modular branch** (to get agents, tools, data folders)
+
+```bash
+git checkout copilot/refactor-app-into-modular-architecture
+```
+
+**Step 4 — Follow [Quick Start](#quick-start)** to install dependencies and run the app.
+
+---
+
 ## 📁 Where are the agents and folders?
 
-> **Note:** The modular architecture (agents, tools, data folders) lives on the
-> **`copilot/refactor-app-into-modular-architecture`** branch — the branch this
-> PR introduces. On `main` you will only see the original single-file `app.py`.
-> **Merge this PR** to bring all of the new structure into `main`.
+> **Note:** If you're viewing this README on the `main` branch and only see `app.py`
+> with no subfolders, this PR has not been merged yet.
+> Switch to the **`copilot/refactor-app-into-modular-architecture`** branch on GitHub
+> (use the branch dropdown) or **merge this PR** to bring the full structure into `main`.
 
 You can browse every file right now on GitHub using these links:
 
@@ -42,27 +106,10 @@ You can browse every file right now on GitHub using these links:
 
 ---
 
-## Where is the repo?
-
-The source code lives on GitHub:
-
-```
-https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2
-```
-
-Clone it to your computer with:
-
-```bash
-git clone https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2.git
-cd Site-Data-Analysis-2
-```
-
-Then follow the **Quick Start** steps below to install dependencies and run the app.
-
 ## Where do I run this?
 
-**On your own machine** — clone the repo (see above), open a terminal in the project
-folder, and follow one of the Quick Start options below.
+**On your own machine** — download or clone the repo (see [Get the Code](#️-get-the-code--download-or-clone) above),
+open a terminal in the project folder, and follow one of the Quick Start options below.
 No hosting, no account, no internet connection required once installed.
 
 ## Quick Start
