@@ -42,6 +42,64 @@ There are two ways to get all of these files onto your computer.
 
 ---
 
+### ❓ I already have a cloned copy — do I delete the old files?
+
+**No — do not delete the old files or the `.git` folder.**
+Instead, copy the new files from inside the extracted ZIP *over* the existing ones.
+
+Here is exactly what to do (Windows example, works the same on Mac/Linux):
+
+**Situation:** Your `Site-Data-Analysis-2` folder looks like this:
+
+```
+Site-Data-Analysis-2\            ← your existing repo folder
+  .git\                           ← KEEP THIS — never delete it
+  .gitignore
+  app.py
+  Dockerfile
+  README.md
+  requirements.txt
+  Site-Data-Analysis-2-copilot-refactor-ap...\   ← the extracted ZIP subfolder
+  Site-Data-Analysis-2-copilot-refactor-ap....zip ← the downloaded ZIP file
+```
+
+**Steps:**
+
+1. **Open** the extracted folder (`Site-Data-Analysis-2-copilot-refactor-ap...`).
+
+2. **Select all files and folders inside it** (press `Ctrl+A` on Windows).
+
+3. **Copy** them (`Ctrl+C`).
+
+4. **Go up one level** back into the `Site-Data-Analysis-2` folder.
+
+5. **Paste** (`Ctrl+V`).
+   When Windows asks *"Replace the files in the destination?"* click **Replace the files in the destination** (or "Yes to all").
+   This will update `app.py`, `README.md`, etc. and add the new `agents/`, `tools/`, and `data/` folders.
+
+6. **Delete** the now-empty extracted subfolder and the `.zip` file — they are no longer needed.
+
+Your `Site-Data-Analysis-2` folder should now look like this:
+
+```
+Site-Data-Analysis-2\
+  .git\
+  .gitignore
+  agents\
+  app.py
+  data\
+  Dockerfile
+  README.md
+  requirements.txt
+  run.bat
+  run.sh
+  tools\
+```
+
+7. **Open a terminal / Command Prompt inside `Site-Data-Analysis-2`** and follow [Quick Start](#quick-start) below.
+
+---
+
 ### Option B — Clone with Git (recommended)
 
 Git lets you pull updates with a single command in the future.
