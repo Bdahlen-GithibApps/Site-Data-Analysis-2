@@ -112,24 +112,49 @@ Git lets you pull updates with a single command in the future.
 | macOS | Open Terminal and type `git --version` — macOS will offer to install it automatically |
 | Linux | `sudo apt install git` (Debian/Ubuntu) or `sudo dnf install git` (Fedora) |
 
+> ⚠️ **Windows — after installing Git, close PowerShell/Command Prompt completely and open a new window.**
+> The new `git` command is only available in terminals opened *after* the installer finishes.
+> If you type `git` and see *"not recognized as a cmdlet"*, this is the reason.
+
 **Step 2 — Clone the repository**
 
-Open a terminal (Git Bash on Windows) and run:
+Open a **new** PowerShell or Command Prompt window and run:
 
-```bash
+```powershell
 git clone https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2.git
-cd Site-Data-Analysis-2
 ```
 
-This downloads all files into a folder called `Site-Data-Analysis-2`.
+This creates a `Site-Data-Analysis-2` folder in your **current directory** (usually `C:\Users\YourName`).
+
+If you want it somewhere else — for example inside `C:\AI App Building\` — navigate there first.
+**Paths with spaces must be wrapped in double quotes:**
+
+```powershell
+cd "C:\AI App Building"
+git clone https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2.git
+cd "C:\AI App Building\Site-Data-Analysis-2"
+```
+
+> 💡 **Quick tip:** In PowerShell, type `cd ` then **drag-and-drop** the folder from File Explorer into the
+> terminal window — Windows inserts the correct quoted path for you automatically.
 
 **Step 3 — Switch to the modular branch** (to get agents, tools, data folders)
 
-```bash
+```powershell
 git checkout copilot/refactor-app-into-modular-architecture
 ```
 
 **Step 4 — Follow [Quick Start](#quick-start)** to install dependencies and run the app.
+
+---
+
+### 🚨 Common PowerShell errors and fixes
+
+| Error message | Cause | Fix |
+|---|---|---|
+| `'git' is not recognized as the name of a cmdlet` | Git is not installed, or the terminal was opened before installing | Install Git from <https://git-scm.com/download/win>, then **close and reopen** PowerShell |
+| `Cannot find path … because it does not exist` after `cd Site-Data-Analysis-2` | The clone command hasn't run yet, or you're in the wrong directory | Run `git clone …` first, *then* `cd Site-Data-Analysis-2` |
+| `A positional parameter cannot be found that accepts argument 'App'` (or 'Building') | The path contains spaces and is not quoted | Wrap the full path in double quotes: `cd "C:\AI App Building\Site-Data-Analysis-2"` |
 
 ---
 
