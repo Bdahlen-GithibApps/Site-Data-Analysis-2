@@ -9,6 +9,39 @@ opens in your regular browser at **http://localhost:8080**.
 Supports Pinellas County, FL with a modular multi-agent architecture
 designed to scale to additional counties.
 
+---
+
+## 📁 Where are the agents and folders?
+
+> **Note:** The modular architecture (agents, tools, data folders) lives on the
+> **`copilot/refactor-app-into-modular-architecture`** branch — the branch this
+> PR introduces. On `main` you will only see the original single-file `app.py`.
+> **Merge this PR** to bring all of the new structure into `main`.
+
+You can browse every file right now on GitHub using these links:
+
+| Folder / File | Description | Browse on GitHub |
+|---|---|---|
+| `agents/` | All agent modules | [📂 agents/](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/tree/copilot/refactor-app-into-modular-architecture/agents) |
+| `agents/orchestrator.py` | Routes queries to all sub-agents | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/agents/orchestrator.py) |
+| `agents/property_agent.py` | Parcel lookup (PCPAO scraper) | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/agents/property_agent.py) |
+| `agents/zoning_agent.py` | Zoning + FLUM + ArcGIS queries | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/agents/zoning_agent.py) |
+| `agents/parking_agent.py` | Parking calculation (MV + ADA + bicycle) | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/agents/parking_agent.py) |
+| `agents/landscape_agent.py` | Buffer / tree / irrigation requirements | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/agents/landscape_agent.py) |
+| `tools/` | Shared utilities | [📂 tools/](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/tree/copilot/refactor-app-into-modular-architecture/tools) |
+| `tools/scraper.py` | PCPAO web scraper | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/tools/scraper.py) |
+| `tools/arcgis_client.py` | ArcGIS REST API client | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/tools/arcgis_client.py) |
+| `tools/helpers.py` | Formatting / validation helpers | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/tools/helpers.py) |
+| `data/pinellas/` | Pinellas County JSON data | [📂 data/pinellas/](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/tree/copilot/refactor-app-into-modular-architecture/data/pinellas) |
+| `data/pinellas/zoning.json` | Zoning district dimensional standards | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/data/pinellas/zoning.json) |
+| `data/pinellas/flum.json` | FLUM density / intensity limits | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/data/pinellas/flum.json) |
+| `data/pinellas/parking.json` | Parking requirements + ADA table | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/data/pinellas/parking.json) |
+| `data/pinellas/landscape.json` | Ch. 138, Art. IV landscape code data | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/data/pinellas/landscape.json) |
+| `data/pinellas/maps.json` | City map + zoning map URLs | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/data/pinellas/maps.json) |
+| `app.py` | NiceGUI frontend (uses all agents) | [🔗 view](https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2/blob/copilot/refactor-app-into-modular-architecture/app.py) |
+
+---
+
 ## Where is the repo?
 
 The source code lives on GitHub:
