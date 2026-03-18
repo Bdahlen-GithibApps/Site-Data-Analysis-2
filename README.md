@@ -1,5 +1,7 @@
 # Site Data Analysis — Multi-Agent Development Code Lookup
 
+**GitHub repository:** <https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2>
+
 A local web app for parcel-driven development requirements lookup.
 You run it **on your own computer** — it starts a small web server and
 opens in your regular browser at **http://localhost:8080**.
@@ -7,9 +9,26 @@ opens in your regular browser at **http://localhost:8080**.
 Supports Pinellas County, FL with a modular multi-agent architecture
 designed to scale to additional counties.
 
+## Where is the repo?
+
+The source code lives on GitHub:
+
+```
+https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2
+```
+
+Clone it to your computer with:
+
+```bash
+git clone https://github.com/Bdahlen-GithibApps/Site-Data-Analysis-2.git
+cd Site-Data-Analysis-2
+```
+
+Then follow the **Quick Start** steps below to install dependencies and run the app.
+
 ## Where do I run this?
 
-**On your own machine** — clone the repo, open a terminal in the project
+**On your own machine** — clone the repo (see above), open a terminal in the project
 folder, and follow one of the Quick Start options below.
 No hosting, no account, no internet connection required once installed.
 
