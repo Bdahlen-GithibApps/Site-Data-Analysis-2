@@ -1,20 +1,37 @@
 # Site Data Analysis — Multi-Agent Development Code Lookup
 
-NiceGUI app for parcel-driven development requirements lookup.
+A local web app for parcel-driven development requirements lookup.
+You run it **on your own computer** — it starts a small web server and
+opens in your regular browser at **http://localhost:8080**.
+
 Supports Pinellas County, FL with a modular multi-agent architecture
 designed to scale to additional counties.
 
+## Where do I run this?
+
+**On your own machine** — clone the repo, open a terminal in the project
+folder, and follow one of the Quick Start options below.
+No hosting, no account, no internet connection required once installed.
+
 ## Quick Start
 
-**Requirements:** Python 3.10 or newer
+**Requirements:** Python 3.10 or newer, installed on your computer.
 
 ### Option 1 — one-liner (Linux / macOS / WSL)
+
+Open a terminal, `cd` into the project folder, then run:
 
 ```bash
 bash run.sh
 ```
 
+The script installs dependencies and starts the server.
+Then open **http://localhost:8080** in your browser (the script prints this URL).
+
 ### Option 2 — manual steps (any OS)
+
+Open a terminal (Command Prompt / PowerShell on Windows), `cd` into the
+project folder, then run:
 
 ```bash
 # 1. Install dependencies
@@ -26,7 +43,7 @@ python app.py
 
 Then open **http://localhost:8080** in your browser.
 
-### Option 3 — Docker
+### Option 3 — Docker (any OS with Docker Desktop)
 
 ```bash
 docker build -t devcode .
