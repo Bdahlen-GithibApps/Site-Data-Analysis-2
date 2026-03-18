@@ -15,9 +15,27 @@ No hosting, no account, no internet connection required once installed.
 
 ## Quick Start
 
-**Requirements:** Python 3.10 or newer, installed on your computer.
+**Requirements:** Python 3.10 or newer — [download from python.org](https://www.python.org/downloads/)
 
-### Option 1 — one-liner (Linux / macOS / WSL)
+---
+
+### 🪟 Windows — one-liner
+
+1. Install Python from <https://www.python.org/downloads/>
+   *(check **"Add Python to PATH"** during installation)*
+2. Download / clone this repository
+3. In **File Explorer**, double-click **`run.bat`**
+   — OR open **Command Prompt** or **PowerShell**, `cd` into the project folder, and type:
+
+```bat
+run.bat
+```
+
+The script installs dependencies, starts the server, and opens your browser at **http://localhost:8080** automatically.
+
+---
+
+### 🐧 Linux / 🍎 macOS / WSL — one-liner
 
 Open a terminal, `cd` into the project folder, then run:
 
@@ -28,10 +46,11 @@ bash run.sh
 The script installs dependencies and starts the server.
 Then open **http://localhost:8080** in your browser (the script prints this URL).
 
-### Option 2 — manual steps (any OS)
+---
 
-Open a terminal (Command Prompt / PowerShell on Windows), `cd` into the
-project folder, then run:
+### Manual steps (any OS)
+
+Open a terminal / Command Prompt in the project folder, then run:
 
 ```bash
 # 1. Install dependencies
@@ -43,7 +62,15 @@ python app.py
 
 Then open **http://localhost:8080** in your browser.
 
-### Option 3 — Docker (any OS with Docker Desktop)
+> **Windows tip:** if `python` is not recognised, try `py -3` instead.
+> **Virtual env (recommended):**
+> - Windows: `python -m venv .venv && .venv\Scripts\activate`
+> - Linux/macOS: `python -m venv .venv && source .venv/bin/activate`
+> then run `pip install -r requirements.txt` inside the activated env.
+
+---
+
+### Docker (any OS with Docker Desktop)
 
 ```bash
 docker build -t devcode .
@@ -51,9 +78,6 @@ docker run -p 8080:8080 devcode
 ```
 
 Then open **http://localhost:8080** in your browser.
-
-> **Windows note:** use `py -3` or `python3` if `python` is not on your PATH.
-> **Virtual env (recommended):** `python -m venv .venv && source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows) before running `pip install`.
 
 ## What It Does
 
@@ -89,6 +113,8 @@ Site-Data-Analysis-2/
 │   └── helpers.py            # safe_float, safe_int, fmt_num, labeled_input, etc.
 ├── requirements.txt
 ├── Dockerfile
+├── run.bat               # Windows quick-start (double-click or run from CMD/PowerShell)
+├── run.sh                # Linux / macOS / WSL quick-start
 └── README.md
 ```
 
@@ -153,6 +179,8 @@ tools/              # Shared utilities
 data/pinellas/      # Pinellas County data as JSON
 requirements.txt    # nicegui, requests, beautifulsoup4, aiohttp
 Dockerfile          # Single container
+run.bat             # Windows quick-start script
+run.sh              # Linux / macOS / WSL quick-start script
 README.md
 ```
 
