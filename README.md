@@ -4,21 +4,39 @@ NiceGUI app for parcel-driven development requirements lookup.
 Supports Pinellas County, FL with a modular multi-agent architecture
 designed to scale to additional counties.
 
-## Run
+## Quick Start
+
+**Requirements:** Python 3.10 or newer
+
+### Option 1 — one-liner (Linux / macOS / WSL)
 
 ```bash
+bash run.sh
+```
+
+### Option 2 — manual steps (any OS)
+
+```bash
+# 1. Install dependencies
 pip install -r requirements.txt
+
+# 2. Start the app
 python app.py
 ```
 
-Opens at http://localhost:8080
+Then open **http://localhost:8080** in your browser.
 
-## Docker
+### Option 3 — Docker
 
 ```bash
 docker build -t devcode .
 docker run -p 8080:8080 devcode
 ```
+
+Then open **http://localhost:8080** in your browser.
+
+> **Windows note:** use `py -3` or `python3` if `python` is not on your PATH.
+> **Virtual env (recommended):** `python -m venv .venv && source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows) before running `pip install`.
 
 ## What It Does
 

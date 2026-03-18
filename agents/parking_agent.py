@@ -15,6 +15,8 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+_ADA_PERCENTAGE = 0.02  # 2% of total spaces for lots > 500
+
 
 class ParkingAgent:
     """Calculates parking requirements for a given county, use type, and building size."""
@@ -49,10 +51,10 @@ class ParkingAgent:
         for row in ada_table:
             if row["total_spaces_min"] <= total_spaces <= row["total_spaces_max"]:
                 if "note" in row and "%" in row["note"]:
-                    return max(row["accessible_required"], math.ceil(total_spaces * 0.02))
+                    return max(row["accessible_required"], math.ceil(total_spaces * _ADA_PERCENTAGE))
                 return row["accessible_required"]
         # Over 1000 spaces: 2% rule (ceiling)
-        return math.ceil(total_spaces * 0.02)
+        return math.ceil(total_spaces * _ADA_PERCENTAGE)
 
     # ──────────────────────────────────────────────────────────────────
     # Bicycle parking (Sec. 138-3603)
