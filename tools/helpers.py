@@ -120,6 +120,15 @@ def _load_maps_data() -> dict:
         return json.load(f)
 
 
+def _load_city_lookup_data() -> dict:
+    path = Path(__file__).parent.parent / "data" / "pinellas" / "cities.json"
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 def _build_map_url_with_address(
     map_url: Optional[str], address: str, city: str, zip_code: str
 ) -> Optional[str]:
@@ -154,7 +163,30 @@ def _build_map_url_with_address(
 
 
 def get_zoning_map_url(city: str, address: str = "", zip_code: str = "") -> Optional[str]:
-    """Get zoning map URL for a city, optionally deep-linked to an address."""
+    """Get zoning map URL for a city, optionally deep-linked to an address.
+
+    Checks cities.json (confirmed/verified URLs) first, then falls back to maps.json.
+    """
+    # ── Try cities.json first (verified URLs) ─────────────────────────────────
+    city_lookup = _load_city_lookup_data()
+    if city:
+        city_key = city.strip().lower()
+        meta = city_lookup.get(city_key)
+        if not meta:
+            for key, data in city_lookup.items():
+                if isinstance(data, dict) and (key in city_key or city_key in key):
+                    meta = data
+                    break
+        if meta:
+            base = None
+            for url_key in ("zoning_flu_app", "zoning_flu_lookup_app", "zoning_app", "gis_viewer_app"):
+                if meta.get(url_key):
+                    base = meta[url_key]
+                    break
+            if base:
+                return _build_map_url_with_address(base, address, city, zip_code)
+
+    # ── Fall back to maps.json ─────────────────────────────────────────────────
     maps_data = _load_maps_data()
     zoning_map_urls = maps_data.get("zoning_map_urls", {})
 
@@ -173,11 +205,7 @@ def get_zoning_map_url(city: str, address: str = "", zip_code: str = "") -> Opti
                 base = url
                 break
 
-    # Unincorporated fallback
-    if not base and "unincorporated" in city.lower():
-        base = zoning_map_urls.get("Unincorporated Pinellas")
-
-    # County fallback for any Pinellas city we don't have a specific URL for
+    # County fallback
     if not base:
         base = zoning_map_urls.get("Unincorporated Pinellas")
 

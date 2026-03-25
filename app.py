@@ -63,6 +63,58 @@ state: Dict[str, Any] = {
     "use_type": "",
     "building_sf": "",
     "num_units": "",
+    # Site Information (SIR)
+    "tax_parcel": "",
+    "site_views": "",
+    "adjoining_uses": "",
+    "proposed_zoning": "",
+    # Subdivision (SIR)
+    "platting": "",
+    "takings_easements": "",
+    # Infrastructure (SIR)
+    "utilities_water": "",
+    "utilities_reclaim": "",
+    "utilities_sewer": "",
+    "utilities_storm": "",
+    "easements_required": "",
+    "utility_extensions": "",
+    "roadway_improvements": "",
+    "signalization": "",
+    "encroachments": "",
+    "additional_access": "",
+    # Environmental (SIR)
+    "impact_studies": "",
+    "stormwater_treatment": "",
+    "wetlands_flood": "",
+    "flood_elevation": "",
+    "natural_cultural": "",
+    "env_considerations": "",
+    "geotechnical": "",
+    "traffic_study": "",
+    # Building (SIR)
+    "building_code": "Florida Building Code",
+    "construction_methods": "",
+    "fire_route": "",
+    # Fees (SIR)
+    "fee_fire_plan_review": "",
+    "fee_bldg_plan_review": "",
+    "fee_site_plan_review": "",
+    "fee_bldg_permit": "",
+    "fee_demo_permit": "",
+    "fee_dedication": "",
+    "fee_securities": "",
+    "fee_lot_line_adj": "",
+    "fee_pre_app": "",
+    "fee_coastal_dev": "",
+    # Schedule (SIR)
+    "sched_lot_line_adj": "",
+    "sched_entitlements": "",
+    "sched_perm_steps": "",
+    "sched_wmd": "",
+    "sched_fdep": "",
+    "sched_fdot": "",
+    "sched_staff_meetings": "",
+    "sched_public_meetings": "",
 }
 
 ui_refs: Dict[str, Any] = {}
@@ -465,53 +517,10 @@ def render_tab_lookup() -> None:
                         ui_refs["city"].value = state["city"]
                         ui_refs["city"].update()
 
-                    refresh_zoning_button()
                     refresh_all()
                     ui.notify("Property data retrieved.", type="positive")
 
                 ui.button("LOOKUP PROPERTY DATA", on_click=do_lookup, color="primary").classes("q-mt-md w-full")
-
-                # Zoning map button
-                ui.label("Zoning & Land Use Map").classes("section-title q-mt-md")
-
-                def open_zoning_map() -> None:
-                    city = state.get("city", "")
-                    address = state.get("address", "")
-                    zip_code = state.get("zip", "")
-                    map_url = get_zoning_map_url(city, address, zip_code)
-                    if map_url:
-                        ui.navigate.to(map_url, new_tab=True)
-                    else:
-                        ui.notify("No zoning map URL found for this municipality.", type="warning")
-
-                zoning_btn = ui.button("OPEN ZONING AND LAND USE MAP", on_click=open_zoning_map).classes("q-mt-sm w-full")
-                ui_refs["zoning_button"] = zoning_btn
-                zoning_status = ui.label("").classes("muted q-mt-xs")
-                zoning_status.visible = False
-                ui_refs["zoning_status"] = zoning_status
-
-                def refresh_zoning_button() -> None:
-                    city = state.get("city", "")
-                    address = state.get("address", "")
-                    zip_code = state.get("zip", "")
-                    map_url = get_zoning_map_url(city, address, zip_code)
-
-                    label_city = city.upper() if city else ""
-                    if "unincorporated" in (city or "").lower():
-                        label_city = "PINELLAS COUNTY"
-                    label = f"OPEN {label_city} ZONING AND LAND USE MAP" if label_city else "OPEN ZONING AND LAND USE MAP"
-                    ui_refs["zoning_button"].text = label
-
-                    if map_url:
-                        ui_refs["zoning_button"].enable()
-                        ui_refs["zoning_status"].text = ""
-                        ui_refs["zoning_status"].visible = False
-                    else:
-                        ui_refs["zoning_button"].disable()
-                        ui_refs["zoning_status"].text = "No zoning map link found for this municipality."
-                        ui_refs["zoning_status"].visible = True
-
-                refresh_zoning_button()
 
             # Lookup summary
             with ui.card().classes("section-card q-mt-md w-full"):
@@ -527,11 +536,77 @@ def render_tab_lookup() -> None:
                 for key in ("address", "city", "zip", "owner", "land_use", "site_area_acres", "site_area_sqft"):
                     ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
 
+            # Site description (SIR manual fields)
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Site Description").classes("section-title")
+                ui_refs["tax_parcel"] = labeled_input("Tax Parcel ID(s)", value=state.get("tax_parcel", ""), placeholder="e.g. 24-31-16-53478-000-0210", classes="lookup-field")
+                ui_refs["site_views"] = labeled_input("Description of Site Views", value=state.get("site_views", ""), placeholder="e.g. Construction bordering left, storefront north", classes="lookup-field")
+                ui_refs["adjoining_uses"] = labeled_input("Adjoining Property Uses and Zoning", value=state.get("adjoining_uses", ""), placeholder="e.g. Zoning: DC-1, Uses: Retail", classes="lookup-field")
+                ui_refs["proposed_zoning"] = labeled_input("Proposed Zoning / Designation", value=state.get("proposed_zoning", ""), placeholder="e.g. CBD", classes="lookup-field")
+                for key in ("tax_parcel", "site_views", "adjoining_uses", "proposed_zoning"):
+                    ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
+
         # RIGHT COLUMN — Zoning + FLU inputs
         with ui.column().classes("col-6"):
             with ui.card().classes("section-card w-full"):
-                ui.label("Zoning & Land Use (from Map)").classes("section-title")
-                ui.label("Look up zoning and FLU on the map, then enter or select below.").classes("muted q-mb-sm")
+                ui.label("Zoning & Land Use").classes("section-title")
+                ui.label("Auto-lookup zoning and FLU from ArcGIS, or select manually below.").classes("muted q-mb-sm")
+
+                def do_zoning_lookup() -> None:
+                    address = state.get("address", "").strip()
+                    city = state.get("city", "").strip()
+                    zip_code = state.get("zip", "").strip()
+
+                    if not address:
+                        ui.notify("Look up a property first to get the address.", type="warning")
+                        return
+
+                    ui.notify("Looking up zoning and land use...", type="info")
+
+                    result = _zoning_agent.arcgis.lookup_city_zoning(city, address)
+
+                    if result.get("open_map"):
+                        # No live API for this city — open the GIS map viewer directly
+                        map_url = get_zoning_map_url(city, address, zip_code)
+                        if map_url:
+                            ui.navigate.to(map_url, new_tab=True)
+                            ui.notify("No live API for this city — GIS map opened. Enter codes manually.", type="info")
+                        else:
+                            ui.notify("No zoning lookup available for this city. Enter codes manually.", type="warning")
+                        return
+
+                    if not result.get("success"):
+                        ui.notify(result.get("error", "Zoning lookup failed."), type="warning")
+                        map_url = get_zoning_map_url(city, address, zip_code)
+                        if map_url:
+                            ui.navigate.to(map_url, new_tab=True)
+                        return
+
+                    detected_zoning = result.get("zoning_code", "")
+                    detected_flu = result.get("future_land_use", "")
+
+                    if detected_zoning:
+                        set_field("zoning", detected_zoning)
+                        ui_refs["zoning_select"].value = detected_zoning
+                        ui_refs["zoning_select"].update()
+                    if detected_flu:
+                        set_field("future_land_use", detected_flu)
+                        ui_refs["flu_select"].value = detected_flu
+                        ui_refs["flu_select"].update()
+
+                    parts = []
+                    if detected_zoning:
+                        parts.append(f"Zoning: {detected_zoning}")
+                    if detected_flu:
+                        parts.append(f"FLU: {detected_flu}")
+                    ui.notify(" | ".join(parts), type="positive")
+
+                    map_url = get_zoning_map_url(city, address, zip_code)
+                    if map_url:
+                        ui.navigate.to(map_url, new_tab=True)
+
+                ui.button("LOOKUP ZONING & FLU", on_click=do_zoning_lookup).classes("q-mt-sm w-full")
+                ui.label("Fills fields automatically and opens the GIS map.").classes("muted q-mt-xs q-mb-md")
 
                 zoning_options = _zoning_agent.get_zoning_options(county)
                 flu_options = _zoning_agent.get_flum_options(county)
@@ -583,6 +658,36 @@ def render_tab_lookup() -> None:
                 use_select.on("change", lambda e: set_field("use_type", e.value or ""))
                 bldg_input.on("change", lambda e: set_field("building_sf", e.value))
                 units_input.on("change", lambda e: set_field("num_units", e.value))
+                ui_refs["use_select"] = use_select
+                ui_refs["bldg_input"] = bldg_input
+                ui_refs["units_input"] = units_input
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                def run_analysis() -> None:
+                    # Read directly from UI elements in case state wasn't updated via change events
+                    zoning = state.get("zoning") or (ui_refs["zoning_select"].value if "zoning_select" in ui_refs else "")
+                    flu = state.get("future_land_use") or (ui_refs["flu_select"].value if "flu_select" in ui_refs else "")
+                    if not zoning and not flu:
+                        ui.notify("Set Zoning District and/or Future Land Use first.", type="warning")
+                        return
+                    # Sync to state
+                    if zoning:
+                        state["zoning"] = zoning
+                    if flu:
+                        state["future_land_use"] = flu
+                    # Sync parking inputs from UI in case change events weren't fired
+                    if "use_select" in ui_refs and ui_refs["use_select"].value:
+                        state["use_type"] = ui_refs["use_select"].value
+                    if "bldg_input" in ui_refs and ui_refs["bldg_input"].value:
+                        state["building_sf"] = ui_refs["bldg_input"].value
+                    if "units_input" in ui_refs and ui_refs["units_input"].value:
+                        state["num_units"] = ui_refs["units_input"].value
+                    refresh_all()
+                    tabs.set_value(tab2)
+                    ui.notify("Analysis complete — see Requirements, Parking, and Landscape tabs.", type="positive")
+
+                ui.button("RUN CODE ANALYSIS", on_click=run_analysis, color="primary").classes("w-full")
+                ui.label("Pulls all zoning, FLU, parking, and landscape requirements from code.").classes("muted q-mt-xs")
 
 
 def render_tab_requirements() -> None:
@@ -604,6 +709,121 @@ def render_tab_landscape() -> None:
     with ui.card().classes("section-card w-full"):
         md = ui.markdown(build_landscape_markdown()).classes("q-mt-sm")
         ui_refs["landscape_md"] = md
+
+
+def _sir_textarea(label: str, key: str) -> None:
+    """Helper: labeled textarea wired to state — uses same pattern as labeled_input."""
+    with ui.column().classes("w-full q-mt-sm"):
+        ui.label(label).classes("field-label")
+        inp = ui.textarea(value=state.get(key, "")).props("outlined dense autogrow").classes("w-full")
+        inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+
+
+def _sir_input(label: str, key: str, placeholder: str = "") -> None:
+    """Helper: labeled single-line input wired to state — uses same pattern as labeled_input."""
+    with ui.column().classes("w-full q-mt-sm"):
+        ui.label(label).classes("field-label")
+        inp = ui.input(value=state.get(key, ""), placeholder=placeholder).props("outlined dense").classes("w-full")
+        inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+
+
+def render_tab_infrastructure() -> None:
+    ui.label("Infrastructure & Utilities").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-start no-wrap gap-8"):
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Public / Private Utilities").classes("section-title")
+                _sir_input("Water Provider", "utilities_water", "e.g. City of St. Petersburg")
+                _sir_input("Reclaimed Water Provider", "utilities_reclaim", "e.g. City of St. Petersburg")
+                _sir_input("Sanitary Sewer Provider", "utilities_sewer", "e.g. City of St. Petersburg")
+                _sir_input("Stormwater / Drainage", "utilities_storm", "e.g. City of St. Petersburg")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Easements & Extensions").classes("section-title")
+                _sir_textarea("Easements Required", "easements_required")
+                _sir_textarea("Utility Extensions Required", "utility_extensions")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Subdivision").classes("section-title")
+                _sir_textarea("Platting / Subdivision Requirements", "platting")
+                _sir_textarea("Anticipated Takings / Easements", "takings_easements")
+
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Roadway & Access").classes("section-title")
+                _sir_textarea("Anticipated Roadway Improvements / ROW Dedication", "roadway_improvements")
+                _sir_input("Signalization Required", "signalization", "e.g. N/A")
+                _sir_textarea("Potential Encroachments", "encroachments")
+                _sir_textarea("Additional Access Available", "additional_access")
+
+
+def render_tab_environmental() -> None:
+    ui.label("Environmental").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-start no-wrap gap-8"):
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Stormwater & Flooding").classes("section-title")
+                _sir_textarea("Storm Water Treatment Requirements", "stormwater_treatment")
+                _sir_textarea("Wetlands or Flood Plains Present", "wetlands_flood")
+                _sir_textarea("Setback / Elevation for Flood Plain", "flood_elevation")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Studies & Impact").classes("section-title")
+                _sir_input("Impact Studies Required", "impact_studies", "e.g. N/A or Traffic, NRA")
+                _sir_input("Traffic Study Required", "traffic_study", "e.g. Not included")
+
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Resources & Conditions").classes("section-title")
+                _sir_textarea("Natural or Cultural Resources", "natural_cultural")
+                _sir_textarea("Environmental Considerations", "env_considerations")
+                _sir_textarea("Geotechnical Considerations", "geotechnical")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Building").classes("section-title")
+                _sir_input("Current Building Code", "building_code", "e.g. Florida Building Code")
+                _sir_textarea("Unique Construction Methods (Sinkholes, Piles, CHHA, etc.)", "construction_methods")
+                _sir_input("Fire Route Considerations", "fire_route", "e.g. N/A")
+
+
+def render_tab_fees_schedule() -> None:
+    ui.label("Fees & Schedule").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-start no-wrap gap-8"):
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Impact / User Fees").classes("section-title")
+                _sir_input("Fire Plan Review", "fee_fire_plan_review", "e.g. $75")
+                _sir_input("Building Plan Review", "fee_bldg_plan_review", "e.g. $50")
+                _sir_input("Site Plan Review (POD)", "fee_site_plan_review", "e.g. $500")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Application / Permit Fees").classes("section-title")
+                _sir_input("Building Permit", "fee_bldg_permit", "e.g. $750")
+                _sir_input("Demolition Permit", "fee_demo_permit", "e.g. $250 (>5,000 sf)")
+                _sir_input("Dedication", "fee_dedication", "e.g. N/A")
+                _sir_input("Securities (Landscape / Utilities)", "fee_securities", "e.g. N/A")
+                _sir_input("Lot Line Adjustment", "fee_lot_line_adj", "e.g. Prelim $1,000 / Final $1,000")
+                _sir_input("Pre-Application Review", "fee_pre_app", "e.g. $238")
+                _sir_input("Coastal Development Permit", "fee_coastal_dev", "e.g. N/A")
+
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Permitting Schedule").classes("section-title")
+                _sir_input("Lot Line Adjustment Timing", "sched_lot_line_adj", "e.g. Concurrent with site plan")
+                _sir_textarea("Entitlements Process", "sched_entitlements")
+                _sir_textarea("Permitting Steps", "sched_perm_steps")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Agency Review Timelines").classes("section-title")
+                _sir_textarea("Local (City / County)", "sched_local")
+                _sir_textarea("WMD Permitting", "sched_wmd")
+                _sir_textarea("FDEP Permitting", "sched_fdep")
+                _sir_textarea("FDOT Permitting", "sched_fdot")
+                _sir_input("Required Municipal Staff Meetings", "sched_staff_meetings")
+                _sir_input("Required Municipal Public Meetings", "sched_public_meetings")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -739,6 +959,9 @@ with ui.tabs().classes("tabs-left") as tabs:
     tab2 = ui.tab("Requirements")
     tab3 = ui.tab("Parking")
     tab4 = ui.tab("Landscape")
+    tab5 = ui.tab("Infrastructure")
+    tab6 = ui.tab("Environmental")
+    tab7 = ui.tab("Fees & Schedule")
 
 with ui.tab_panels(tabs, value=tab1).classes("w-full"):
     with ui.tab_panel(tab1):
@@ -753,10 +976,19 @@ with ui.tab_panels(tabs, value=tab1).classes("w-full"):
     with ui.tab_panel(tab4):
         with ui.card().classes("w-full tab-card"):
             render_tab_landscape()
+    with ui.tab_panel(tab5):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_infrastructure()
+    with ui.tab_panel(tab6):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_environmental()
+    with ui.tab_panel(tab7):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_fees_schedule()
 
 ui.run(
     title="Dev Code Lookup",
-    port=8080,
+    port=8081,
     show=False,
     reload=False,
 )

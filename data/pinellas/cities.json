@@ -1,0 +1,268 @@
+{
+  "_comment": "Pinellas County Cities - GIS portal URLs. url_type: 'gis_viewer' = interactive ArcGIS map; 'planning_page' = city planning dept page; 'county_viewer' = county EGIS fallback.",
+  "_last_updated": "2026-03-20",
+
+  "st. petersburg": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "St. Petersburg",
+    "zoning_flu_app": "https://egis.stpete.org/arcgis/apps/webappviewer/index.html?id=8ef6cd2e36894c68b1b1bd2b1de99e3e",
+    "zoning_api": "https://egis.stpete.org/arcgis/rest/services/ServicesDOTS/Zoning/MapServer/0/query",
+    "zoning_api_fields": "ZONECLASS,ZONEDESC",
+    "flu_api": "https://egis.stpete.org/arcgis/rest/services/ServicesDOTS/Zoning/MapServer/2/query",
+    "flu_api_fields": "LANDUSECODE,LANDUSEDESC",
+    "geocode_city_suffix": "St. Petersburg, FL",
+    "notes": "Zoning + FLU API confirmed. Interactive viewer confirmed."
+  },
+
+  "clearwater": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Clearwater",
+    "zoning_flu_app": "https://cityofclearwater.maps.arcgis.com/apps/webappviewer/index.html?id=1787a41a5bc7484fa499f6f4a13539ac",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS web app viewer confirmed."
+  },
+
+  "largo": {
+    "type": "city_app",
+    "url_type": "planning_page",
+    "name": "Largo",
+    "zoning_flu_app": "https://cms7files.revize.com/largoflorida/UpdateMap1_FutureLandUseMap2.pdf?t=201906131308340&t=201906131308340",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Largo Future Land Use Map PDF."
+  },
+
+  "pinellas park": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Pinellas Park",
+    "zoning_flu_app": "https://pinellas-park.maps.arcgis.com/apps/webappviewer/index.html?id=0e17a532289848c4b7fcc2de3c993771",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS web app viewer confirmed."
+  },
+
+  "dunedin": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Dunedin",
+    "zoning_flu_app": "https://dunedin-gis.maps.arcgis.com/apps/webappviewer/index.html?id=5590c8f613394a9c99b83960b839ef5c",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS web app viewer confirmed."
+  },
+
+  "tarpon springs": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Tarpon Springs",
+    "zoning_flu_app": "https://gis.ctsfl.us/portal/apps/webappviewer/index.html?id=9596539ae16744b4af44d320f190c791",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS web app viewer confirmed. Self-hosted portal at gis.ctsfl.us."
+  },
+
+  "safety harbor": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Safety Harbor",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/ad211446c4ca49aca040800fd8453631",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS Experience Builder app confirmed."
+  },
+
+  "oldsmar": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Oldsmar",
+    "zoning_flu_app": "https://oldsmar.maps.arcgis.com/apps/webappviewer/index.html?id=4f248d9a284547129b0ac4cda0efa7aa",
+    "flu_lookup_app": "https://oldsmar.maps.arcgis.com/apps/instant/lookup/index.html?appid=3bd70e606dd846c28d6620d4eb155a5f",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Zoning: ArcGIS web app viewer. FLU: ArcGIS Instant Lookup app (address-driven). Discovery script should extract FLU feature service from flu_lookup_app."
+  },
+
+  "seminole": {
+    "type": "city_app",
+    "url_type": "planning_page",
+    "name": "Seminole",
+    "zoning_flu_app": "https://www.myseminole.com/government/departments/planning-and-zoning",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Seminole Planning & Zoning page."
+  },
+
+  "gulfport": {
+    "type": "city_app",
+    "url_type": "planning_page",
+    "name": "Gulfport",
+    "zoning_flu_app": "https://mygulfport.us/wp-content/uploads/2026/02/Maps-12-15-25.pdf",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Direct link to Gulfport Zoning Maps PDF (updated Feb 2026). No interactive GIS viewer found."
+  },
+
+  "kenneth city": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Kenneth City",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": "https://egis.pinellas.gov/gis/rest/services/AGO/PPC_Data/MapServer/3/query",
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. Query API confirmed via PPC_Data MapServer layer 3."
+  },
+
+  "madeira beach": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Madeira Beach",
+    "zoning_flu_app": "https://madeirabeachfl.gov/madeira-beach-zoning-and-rental-restrictions-interactive-map/",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Interactive zoning and rental restrictions map. Embedded viewer on city website."
+  },
+
+  "treasure island": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Treasure Island",
+    "zoning_flu_app": "https://www.arcgis.com/apps/webappviewer/index.html?id=4cd3ea91ea734aefa0d48017d953b588",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS Online web app viewer confirmed."
+  },
+
+  "st. pete beach": {
+    "type": "city_app",
+    "url_type": "planning_page",
+    "name": "St. Pete Beach",
+    "zoning_flu_app": "https://www.stpetebeach.org/DocumentCenter/View/878/Zoning-Maps-PDF",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Direct link to St. Pete Beach Zoning Maps PDF. No interactive GIS viewer found."
+  },
+
+  "south pasadena": {
+    "type": "city_app",
+    "url_type": "planning_page",
+    "name": "South Pasadena",
+    "zoning_flu_app": "https://files.mysouthpasadena.com/Departments/Community%20Improvement/South%20Pasadena%20Zoning%20Map_112216_small.pdf",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Direct link to South Pasadena Zoning Map PDF. No interactive GIS viewer found."
+  },
+
+  "belleair": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Belleair",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": "https://egis.pinellas.gov/gis/rest/services/AGO/PPC_Data/MapServer/0/query",
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. Query API confirmed via PPC_Data MapServer layer 0."
+  },
+
+  "belleair beach": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Belleair Beach",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. PPC_Data layer ID not yet confirmed."
+  },
+
+  "belleair bluffs": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Belleair Bluffs",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. PPC_Data layer ID not yet confirmed."
+  },
+
+  "indian rocks beach": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Indian Rocks Beach",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": "https://egis.pinellas.gov/gis/rest/services/AGO/PPC_Data/MapServer/1/query",
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. Query API confirmed via PPC_Data MapServer layer 1."
+  },
+
+  "indian shores": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Indian Shores",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": "https://egis.pinellas.gov/gis/rest/services/AGO/PPC_Data/MapServer/2/query",
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. Query API confirmed via PPC_Data MapServer layer 2."
+  },
+
+  "north redington beach": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "North Redington Beach",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": "https://egis.pinellas.gov/gis/rest/services/AGO/PPC_Data/MapServer/5/query",
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. Query API confirmed via PPC_Data MapServer layer 5."
+  },
+
+  "redington beach": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Redington Beach",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. PPC_Data layer ID not yet confirmed."
+  },
+
+  "redington shores": {
+    "type": "city_app",
+    "url_type": "county_viewer",
+    "name": "Redington Shores",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": "https://egis.pinellas.gov/gis/rest/services/AGO/PPC_Data/MapServer/6/query",
+    "flu_api": null,
+    "notes": "Zoning maintained by Pinellas Planning Council. Query API confirmed via PPC_Data MapServer layer 6."
+  },
+
+  "tierra verde": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Tierra Verde",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Unincorporated community - uses Pinellas County Experience Builder (Landuse_Zoning layers)."
+  },
+
+  "palm harbor": {
+    "type": "city_app",
+    "url_type": "gis_viewer",
+    "name": "Palm Harbor",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "Unincorporated community (CDP) - uses Pinellas County Experience Builder (Landuse_Zoning layers)."
+  },
+
+  "unincorporated pinellas": {
+    "type": "county_service",
+    "url_type": "gis_viewer",
+    "name": "Unincorporated Pinellas County",
+    "zoning_flu_app": "https://experience.arcgis.com/experience/68137ff2d30b4a47b52408c1162f8b06",
+    "zoning_api": null,
+    "flu_api": null,
+    "notes": "ArcGIS Experience Builder confirmed. Shows Landuse_Zoning layers. Zoning regulated by Pinellas County Chapter 138 LDC."
+  }
+}
