@@ -22,6 +22,7 @@ from nicegui import ui
 from agents.zoning_agent import ZoningAgent
 from agents.parking_agent import ParkingAgent
 from agents.landscape_agent import LandscapeAgent
+from agents.infrastructure_agent import InfrastructureAgent
 from tools.scraper import scrape_pinellas_property, expand_city_name
 from tools.helpers import (
     safe_float,
@@ -40,6 +41,7 @@ from tools.helpers import (
 _zoning_agent = ZoningAgent()
 _parking_agent = ParkingAgent()
 _landscape_agent = LandscapeAgent()
+_infra_agent = InfrastructureAgent()
 
 # ──────────────────────────────────────────────────────────────────────
 # App state
@@ -76,6 +78,8 @@ state: Dict[str, Any] = {
     "utilities_reclaim": "",
     "utilities_sewer": "",
     "utilities_storm": "",
+    "utilities_gas": "",
+    "utilities_electric": "",
     "easements_required": "",
     "utility_extensions": "",
     "roadway_improvements": "",
@@ -110,6 +114,7 @@ state: Dict[str, Any] = {
     "sched_lot_line_adj": "",
     "sched_entitlements": "",
     "sched_perm_steps": "",
+    "sched_local": "",
     "sched_wmd": "",
     "sched_fdep": "",
     "sched_fdot": "",
@@ -717,6 +722,7 @@ def _sir_textarea(label: str, key: str) -> None:
         ui.label(label).classes("field-label")
         inp = ui.textarea(value=state.get(key, "")).props("outlined dense autogrow").classes("w-full")
         inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+        ui_refs[key] = inp
 
 
 def _sir_input(label: str, key: str, placeholder: str = "") -> None:
@@ -725,10 +731,58 @@ def _sir_input(label: str, key: str, placeholder: str = "") -> None:
         ui.label(label).classes("field-label")
         inp = ui.input(value=state.get(key, ""), placeholder=placeholder).props("outlined dense").classes("w-full")
         inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+        ui_refs[key] = inp
 
 
 def render_tab_infrastructure() -> None:
     ui.label("Infrastructure & Utilities").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-center gap-4 q-mb-md"):
+        infra_status = ui.label("").classes("muted")
+
+        def do_infra_lookup() -> None:
+            address = state.get("address", "").strip()
+            city = state.get("city", "").strip()
+            zip_code = state.get("zip", "").strip()
+            county = state.get("county", "Pinellas")
+
+            if not address:
+                ui.notify("Look up a property first to populate the address.", type="warning")
+                return
+
+            infra_status.text = "Querying GIS services…"
+            infra_status.update()
+
+            result = _infra_agent.lookup(address, city, zip_code, county)
+
+            if result.get("error"):
+                ui.notify(result["error"], type="negative")
+                infra_status.text = result["error"]
+                infra_status.update()
+                return
+
+            populated = []
+            for key, value in result.items():
+                if key == "error" or not value:
+                    continue
+                state[key] = value
+                ref = ui_refs.get(key)
+                if ref is not None and hasattr(ref, "value"):
+                    ref.value = value
+                    ref.update()
+                populated.append(key)
+
+            count = len(populated)
+            if count:
+                ui.notify(f"Infrastructure data populated — {count} fields filled.", type="positive")
+                infra_status.text = f"Auto-fill complete: {count} fields populated from Pinellas GIS."
+            else:
+                ui.notify("No data returned from GIS services. Try looking up the property first.", type="warning")
+                infra_status.text = "No data returned."
+            infra_status.update()
+
+        ui.button("LOOKUP INFRASTRUCTURE", on_click=do_infra_lookup).props("icon=search")
+        ui.label("Populates utilities, roads, and easements from Pinellas County GIS.").classes("muted")
 
     with ui.row().classes("w-full items-start no-wrap gap-8"):
         with ui.column().classes("col-6"):
@@ -738,6 +792,8 @@ def render_tab_infrastructure() -> None:
                 _sir_input("Reclaimed Water Provider", "utilities_reclaim", "e.g. City of St. Petersburg")
                 _sir_input("Sanitary Sewer Provider", "utilities_sewer", "e.g. City of St. Petersburg")
                 _sir_input("Stormwater / Drainage", "utilities_storm", "e.g. City of St. Petersburg")
+                _sir_input("Gas Provider", "utilities_gas", "e.g. TECO Peoples Gas")
+                _sir_input("Electric Provider", "utilities_electric", "e.g. Duke Energy Florida")
 
             with ui.card().classes("section-card q-mt-md w-full"):
                 ui.label("Easements & Extensions").classes("section-title")
