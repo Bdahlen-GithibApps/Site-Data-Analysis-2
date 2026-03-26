@@ -525,6 +525,25 @@ def render_tab_lookup() -> None:
                     refresh_all()
                     ui.notify("Property data retrieved.", type="positive")
 
+                    # Auto-run infrastructure lookup using the resolved address + city
+                    ui.notify("Fetching infrastructure data...", type="info")
+                    infra_result = _infra_agent.lookup(
+                        state.get("address", ""),
+                        state.get("city", ""),
+                        state.get("zip", ""),
+                        state.get("county", "Pinellas"),
+                    )
+                    if not infra_result.get("error"):
+                        for key, value in infra_result.items():
+                            if key == "error" or not value:
+                                continue
+                            state[key] = value
+                            ref = ui_refs.get(key)
+                            if ref is not None and hasattr(ref, "value"):
+                                ref.value = value
+                                ref.update()
+                        ui.notify("Infrastructure data populated.", type="positive")
+
                 ui.button("LOOKUP PROPERTY DATA", on_click=do_lookup, color="primary").classes("q-mt-md w-full")
 
             # Lookup summary
@@ -720,7 +739,7 @@ def _sir_textarea(label: str, key: str) -> None:
     """Helper: labeled textarea wired to state — uses same pattern as labeled_input."""
     with ui.column().classes("w-full q-mt-sm"):
         ui.label(label).classes("field-label")
-        inp = ui.textarea(value=state.get(key, "")).props("outlined dense autogrow").classes("w-full")
+        inp = ui.textarea(value=state.get(key, "")).props("outlined rows=5").classes("w-full sir-textarea")
         inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
         ui_refs[key] = inp
 
@@ -941,6 +960,20 @@ ui.add_css(
     .q-field:not(.q-field--textarea) .q-field__control {
         min-height: 40px;
         height: 40px;
+    }
+    .sir-textarea .q-field__control {
+        min-height: 120px !important;
+        align-items: flex-start !important;
+    }
+    .sir-textarea .q-field__native {
+        min-height: 100px !important;
+        height: auto !important;
+        overflow-y: auto !important;
+        resize: vertical;
+        vertical-align: top !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        padding-top: 6px !important;
     }
     .q-field--focused .q-field__control {
         border-color: var(--navy);
