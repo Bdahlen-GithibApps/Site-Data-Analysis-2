@@ -23,7 +23,8 @@ from agents.zoning_agent import ZoningAgent
 from agents.parking_agent import ParkingAgent
 from agents.landscape_agent import LandscapeAgent
 from agents.infrastructure_agent import InfrastructureAgent
-from tools.scraper import scrape_pinellas_property, expand_city_name
+from agents.environmental_agent import EnvironmentalAgent
+from tools.scraper import scrape_pinellas_property, expand_city_name, lookup_dor_use_code
 from tools.helpers import (
     safe_float,
     safe_int,
@@ -42,6 +43,7 @@ _zoning_agent = ZoningAgent()
 _parking_agent = ParkingAgent()
 _landscape_agent = LandscapeAgent()
 _infra_agent = InfrastructureAgent()
+_env_agent = EnvironmentalAgent()
 
 # ──────────────────────────────────────────────────────────────────────
 # App state
@@ -131,6 +133,7 @@ ui_refs: Dict[str, Any] = {}
 
 def build_requirements_markdown() -> str:
     county = state.get("county", "Pinellas")
+    city = state.get("city", "")
     zoning_code = (state.get("zoning") or "").strip().upper()
     flu_code = (state.get("future_land_use") or "").strip().upper()
     site_sf = safe_float(state.get("site_area_sqft"))
@@ -141,7 +144,7 @@ def build_requirements_markdown() -> str:
     lines: List[str] = []
 
     # Dimensional standards
-    zd = _zoning_agent.get_zoning_standards(county, zoning_code) if zoning_code else None
+    zd = _zoning_agent.get_zoning_standards(county, zoning_code, city) if zoning_code else None
     if zd:
         lines.append(f"### Zoning: {zoning_code} — {zd['name']}")
         lines.append(f"**Category:** {zd['category']}")
@@ -194,7 +197,7 @@ def build_requirements_markdown() -> str:
         lines.append("")
 
     # FLUM
-    flu = _zoning_agent.get_flum_standards(county, flu_code) if flu_code else None
+    flu = _zoning_agent.get_flum_standards(county, flu_code, city) if flu_code else None
     if flu:
         lines.append(f"### Future Land Use: {flu_code} — {flu['name']}")
         lines.append("")
@@ -227,7 +230,7 @@ def build_requirements_markdown() -> str:
 
         # Compatibility check
         if zoning_code and flu.get("compatible_zoning"):
-            compat = _zoning_agent.check_compatibility(county, zoning_code, flu_code)
+            compat = _zoning_agent.check_compatibility(county, zoning_code, flu_code, city)
             if compat.get("compatible"):
                 lines.append(f"✅ Zoning **{zoning_code}** is consistent with FLU **{flu_code}**")
             else:
@@ -237,10 +240,21 @@ def build_requirements_markdown() -> str:
         lines.append(f"⚠️ FLU category **{flu_code}** not found in data tables.")
         lines.append("")
 
-    # Code references
+    # Code references — dynamic based on jurisdiction
+    city_lower = city.strip().lower()
     lines.append("---")
     lines.append("**Code References:**")
-    lines.append("Ch. 138, Art. III — Zoning Districts · Sec. 138-3501 — Building Height · Sec. 138-3505 — Setbacks · Comprehensive Plan — Future Land Use Element")
+    if "st. pete" in city_lower or "st pete" in city_lower or "saint pete" in city_lower:
+        lines.append(
+            "City of St. Petersburg Land Development Regulations (LDR), Chapter 16 — Zoning Districts · "
+            "City of St. Petersburg Comprehensive Plan — Future Land Use Element · stpete.org/ldr"
+        )
+    else:
+        jurisdiction = _zoning_agent.get_jurisdiction_name(county, city)
+        lines.append(
+            f"{jurisdiction} — Ch. 138, Art. III — Zoning Districts · Sec. 138-3501 — Building Height · "
+            "Sec. 138-3505 — Setbacks · Comprehensive Plan — Future Land Use Element"
+        )
 
     return "\n".join(lines)
 
@@ -522,8 +536,25 @@ def render_tab_lookup() -> None:
                         ui_refs["city"].value = state["city"]
                         ui_refs["city"].update()
 
+                    # Enrich land use with official DOR description
+                    raw_land_use = result.get("land_use", "") or ""
+                    enriched = lookup_dor_use_code(raw_land_use)
+                    state["land_use"] = enriched
+                    if "land_use" in ui_refs:
+                        ui_refs["land_use"].value = enriched
+                        ui_refs["land_use"].update()
+
                     refresh_all()
                     ui.notify("Property data retrieved.", type="positive")
+
+                    # Update zoning city label so user knows which map to open
+                    if "zoning_city_label" in ui_refs:
+                        detected_city = state.get("city", "")
+                        ui_refs["zoning_city_label"].text = (
+                            f"City detected: {detected_city} — open the zoning map above, "
+                            "find the zoning code, then enter it below."
+                        )
+                        ui_refs["zoning_city_label"].update()
 
                     # Auto-run infrastructure lookup using the resolved address + city
                     ui.notify("Fetching infrastructure data...", type="info")
@@ -543,6 +574,27 @@ def render_tab_lookup() -> None:
                                 ref.value = value
                                 ref.update()
                         ui.notify("Infrastructure data populated.", type="positive")
+
+                    # Auto-run environmental lookup
+                    ui.notify("Fetching environmental data...", type="info")
+                    env_result = _env_agent.lookup(
+                        state.get("address", ""),
+                        state.get("city", ""),
+                        state.get("zip", ""),
+                        state.get("county", "Pinellas"),
+                    )
+                    flood_zone = env_result.pop("_flood_zone", "")
+                    if not env_result.get("error"):
+                        for key, value in env_result.items():
+                            if key == "error" or not value:
+                                continue
+                            state[key] = value
+                            ref = ui_refs.get(key)
+                            if ref is not None and hasattr(ref, "value"):
+                                ref.value = value
+                                ref.update()
+                        zone_msg = f" (FEMA Zone {flood_zone})" if flood_zone else ""
+                        ui.notify(f"Environmental data populated{zone_msg}.", type="positive")
 
                 ui.button("LOOKUP PROPERTY DATA", on_click=do_lookup, color="primary").classes("q-mt-md w-full")
 
@@ -574,86 +626,52 @@ def render_tab_lookup() -> None:
         with ui.column().classes("col-6"):
             with ui.card().classes("section-card w-full"):
                 ui.label("Zoning & Land Use").classes("section-title")
-                ui.label("Auto-lookup zoning and FLU from ArcGIS, or select manually below.").classes("muted q-mb-sm")
+                ui.label(
+                    "After looking up a parcel, open the zoning map for the detected city. "
+                    "Find the zoning code on the map and type it in below — "
+                    "the requirements tabs will populate automatically."
+                ).classes("muted q-mb-sm")
 
-                def do_zoning_lookup() -> None:
-                    address = state.get("address", "").strip()
+                zoning_city_label = ui.label("Look up a parcel first to detect the city.").classes("text-caption text-italic q-mb-sm")
+                ui_refs["zoning_city_label"] = zoning_city_label
+
+                def open_zoning_map() -> None:
                     city = state.get("city", "").strip()
+                    address = state.get("address", "").strip()
                     zip_code = state.get("zip", "").strip()
-
-                    if not address:
-                        ui.notify("Look up a property first to get the address.", type="warning")
+                    if not city:
+                        ui.notify("Look up a property first to detect the city.", type="warning")
                         return
-
-                    ui.notify("Looking up zoning and land use...", type="info")
-
-                    result = _zoning_agent.arcgis.lookup_city_zoning(city, address)
-
-                    if result.get("open_map"):
-                        # No live API for this city — open the GIS map viewer directly
-                        map_url = get_zoning_map_url(city, address, zip_code)
-                        if map_url:
-                            ui.navigate.to(map_url, new_tab=True)
-                            ui.notify("No live API for this city — GIS map opened. Enter codes manually.", type="info")
-                        else:
-                            ui.notify("No zoning lookup available for this city. Enter codes manually.", type="warning")
-                        return
-
-                    if not result.get("success"):
-                        ui.notify(result.get("error", "Zoning lookup failed."), type="warning")
-                        map_url = get_zoning_map_url(city, address, zip_code)
-                        if map_url:
-                            ui.navigate.to(map_url, new_tab=True)
-                        return
-
-                    detected_zoning = result.get("zoning_code", "")
-                    detected_flu = result.get("future_land_use", "")
-
-                    if detected_zoning:
-                        set_field("zoning", detected_zoning)
-                        ui_refs["zoning_select"].value = detected_zoning
-                        ui_refs["zoning_select"].update()
-                    if detected_flu:
-                        set_field("future_land_use", detected_flu)
-                        ui_refs["flu_select"].value = detected_flu
-                        ui_refs["flu_select"].update()
-
-                    parts = []
-                    if detected_zoning:
-                        parts.append(f"Zoning: {detected_zoning}")
-                    if detected_flu:
-                        parts.append(f"FLU: {detected_flu}")
-                    ui.notify(" | ".join(parts), type="positive")
-
                     map_url = get_zoning_map_url(city, address, zip_code)
                     if map_url:
                         ui.navigate.to(map_url, new_tab=True)
+                    else:
+                        ui.notify(f"No zoning map URL available for {city}.", type="warning")
 
-                ui.button("LOOKUP ZONING & FLU", on_click=do_zoning_lookup).classes("q-mt-sm w-full")
-                ui.label("Fills fields automatically and opens the GIS map.").classes("muted q-mt-xs q-mb-md")
+                ui.button("OPEN ZONING MAP", on_click=open_zoning_map, icon="map").classes("q-mb-md w-full")
 
-                zoning_options = _zoning_agent.get_zoning_options(county)
-                flu_options = _zoning_agent.get_flum_options(county)
+                def on_zoning_changed(e) -> None:
+                    set_field("zoning", e.value or "")
+                    if (e.value or "").strip():
+                        refresh_all()
 
-                zoning_select = labeled_select(
+                zoning_input = labeled_input(
                     "Zoning District",
-                    zoning_options,
-                    value=state.get("zoning") or None,
+                    value=state.get("zoning", ""),
+                    placeholder="e.g. NT-1, CC-2, CG, DC-1 ...",
                     classes="code-field",
-                    with_input=True,
                 )
-                flu_select = labeled_select(
-                    "Future Land Use (FLUM)",
-                    flu_options,
-                    value=state.get("future_land_use") or None,
-                    classes="code-field",
-                    with_input=True,
-                )
-                ui_refs["zoning_select"] = zoning_select
-                ui_refs["flu_select"] = flu_select
+                zoning_input.on("change", on_zoning_changed)
+                ui_refs["zoning_select"] = zoning_input  # alias kept for run_analysis() compatibility
 
-                zoning_select.on("change", lambda e: set_field("zoning", e.value or ""))
-                flu_select.on("change", lambda e: set_field("future_land_use", e.value or ""))
+                flu_input = labeled_input(
+                    "Future Land Use (FLUM)",
+                    value=state.get("future_land_use", ""),
+                    placeholder="e.g. CMU, RES-1, NC, R-6 ...",
+                    classes="code-field",
+                )
+                flu_input.on("change", lambda e: set_field("future_land_use", e.value or ""))
+                ui_refs["flu_select"] = flu_input  # alias kept for run_analysis() compatibility
 
             with ui.card().classes("section-card q-mt-md w-full"):
                 ui.label("Parking Input").classes("section-title")
@@ -835,6 +853,44 @@ def render_tab_infrastructure() -> None:
 
 def render_tab_environmental() -> None:
     ui.label("Environmental").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-center gap-4 q-mb-md"):
+        env_status = ui.label("").classes("muted")
+
+        def do_env_lookup() -> None:
+            address = state.get("address", "").strip()
+            city = state.get("city", "").strip()
+            zip_code = state.get("zip", "").strip()
+            county = state.get("county", "Pinellas")
+            if not address:
+                ui.notify("Look up a property first to populate the address.", type="warning")
+                return
+            env_status.text = "Querying FEMA and Pinellas GIS..."
+            env_status.update()
+            result = _env_agent.lookup(address, city, zip_code, county)
+            flood_zone = result.pop("_flood_zone", "")
+            if result.get("error"):
+                ui.notify(result["error"], type="negative")
+                env_status.text = result["error"]
+                env_status.update()
+                return
+            populated = []
+            for key, value in result.items():
+                if key == "error" or not value:
+                    continue
+                state[key] = value
+                ref = ui_refs.get(key)
+                if ref is not None and hasattr(ref, "value"):
+                    ref.value = value
+                    ref.update()
+                populated.append(key)
+            zone_msg = f" — FEMA Zone {flood_zone}" if flood_zone else ""
+            env_status.text = f"Auto-fill complete: {len(populated)} fields populated{zone_msg}."
+            env_status.update()
+            ui.notify(f"Environmental data populated{zone_msg}.", type="positive")
+
+        ui.button("LOOKUP ENVIRONMENTAL", on_click=do_env_lookup).props("icon=nature")
+        ui.label("Queries FEMA flood zones, CCCL proximity, and applies Pinellas/FL standards.").classes("muted")
 
     with ui.row().classes("w-full items-start no-wrap gap-8"):
         with ui.column().classes("col-6"):

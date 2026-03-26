@@ -1,7 +1,8 @@
 """
 agents/zoning_agent.py — Zoning & FLUM code lookup agent.
 
-Loads county-specific zoning/FLUM data from JSON files under data/<county>/.
+Loads city- or county-specific zoning/FLUM data from JSON files under data/<city_slug>/
+or data/<county>/. City-level data takes priority over county-level data.
 Optionally queries ArcGIS REST services to auto-detect codes from coordinates.
 """
 
@@ -16,11 +17,28 @@ from tools.arcgis_client import ArcGISClient
 
 logger = logging.getLogger(__name__)
 
+# Map normalized city names to their data folder slug.
+# Add entries here as city-specific data files are created.
+_CITY_SLUG_MAP: Dict[str, str] = {
+    "st. petersburg": "st_petersburg",
+    "st petersburg": "st_petersburg",
+    "saint petersburg": "st_petersburg",
+}
+
+
+def _city_slug(city: str) -> Optional[str]:
+    """Return the data folder slug for a city, or None if no city-specific data exists."""
+    if not city:
+        return None
+    return _CITY_SLUG_MAP.get(city.strip().lower())
+
 
 class ZoningAgent:
     """
     Provides dimensional standards (setbacks, height, lot size) for zoning
     districts and density/intensity limits for FLUM categories.
+
+    Lookup priority: city-specific data file → county data file.
     """
 
     def __init__(self):
@@ -31,7 +49,21 @@ class ZoningAgent:
     # Data loading
     # ──────────────────────────────────────────────────────────────────
 
-    def _load(self, county: str, dataset: str) -> Dict:
+    def _load(self, county: str, dataset: str, city: str = "") -> Dict:
+        """Load dataset, checking city-specific folder first, then county folder."""
+        slug = _city_slug(city)
+        if slug:
+            key = f"{slug}/{dataset}"
+            if key not in self._cache:
+                path = Path(__file__).parent.parent / "data" / slug / f"{dataset}.json"
+                if path.exists():
+                    with path.open() as f:
+                        self._cache[key] = json.load(f)
+                    return self._cache[key]
+                # No city file — fall through to county
+            else:
+                return self._cache[key]
+
         key = f"{county}/{dataset}"
         if key not in self._cache:
             path = Path(__file__).parent.parent / "data" / county.lower() / f"{dataset}.json"
@@ -43,32 +75,39 @@ class ZoningAgent:
                 self._cache[key] = {}
         return self._cache[key]
 
+    def get_jurisdiction_name(self, county: str, city: str = "") -> str:
+        """Return a human-readable jurisdiction label for use in code references."""
+        slug = _city_slug(city)
+        if slug:
+            return city.strip().title()
+        return f"Unincorporated {county.strip().title()} County"
+
     # ──────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────
 
-    def get_zoning_standards(self, county: str, zoning_code: str) -> Optional[Dict[str, Any]]:
+    def get_zoning_standards(self, county: str, zoning_code: str, city: str = "") -> Optional[Dict[str, Any]]:
         """Return dimensional standards for a zoning district code."""
-        data = self._load(county, "zoning")
+        data = self._load(county, "zoning", city)
         return data.get(zoning_code.upper().strip())
 
-    def get_flum_standards(self, county: str, flum_code: str) -> Optional[Dict[str, Any]]:
+    def get_flum_standards(self, county: str, flum_code: str, city: str = "") -> Optional[Dict[str, Any]]:
         """Return density/intensity standards for a FLUM category code."""
-        data = self._load(county, "flum")
+        data = self._load(county, "flum", city)
         return data.get(flum_code.upper().strip())
 
-    def get_zoning_options(self, county: str) -> Dict[str, str]:
-        """Return {code: label} dict of all zoning districts for a county."""
-        data = self._load(county, "zoning")
-        return {code: f"{code} — {d.get('name', '')}" for code, d in data.items()}
+    def get_zoning_options(self, county: str, city: str = "") -> Dict[str, str]:
+        """Return {code: label} dict of all zoning districts for a county/city."""
+        data = self._load(county, "zoning", city)
+        return {code: f"{code} — {d.get('name', '')}" for code, d in data.items() if not code.startswith("_")}
 
-    def get_flum_options(self, county: str) -> Dict[str, str]:
-        """Return {code: label} dict of all FLUM categories for a county."""
-        data = self._load(county, "flum")
-        return {code: f"{code} — {d.get('name', '')}" for code, d in data.items()}
+    def get_flum_options(self, county: str, city: str = "") -> Dict[str, str]:
+        """Return {code: label} dict of all FLUM categories for a county/city."""
+        data = self._load(county, "flum", city)
+        return {code: f"{code} — {d.get('name', '')}" for code, d in data.items() if not code.startswith("_")}
 
     def check_compatibility(
-        self, county: str, zoning_code: str, flum_code: str
+        self, county: str, zoning_code: str, flum_code: str, city: str = ""
     ) -> Dict[str, Any]:
         """
         Check whether a zoning district is compatible with a FLUM category.
@@ -77,7 +116,7 @@ class ZoningAgent:
             compatible (bool), zoning_code, flum_code, compatible_zoning (list),
             message (str)
         """
-        flum = self.get_flum_standards(county, flum_code)
+        flum = self.get_flum_standards(county, flum_code, city)
         if not flum:
             return {
                 "compatible": None,

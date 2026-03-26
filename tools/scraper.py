@@ -35,15 +35,56 @@ def expand_city_name(city_abbr: str) -> str:
     return city_map.get(city_abbr.strip().upper(), city_abbr)
 
 
-def strip_dor_code(land_use_text: str) -> str:
-    if not land_use_text:
+def _load_dor_use_codes() -> Dict[str, Any]:
+    path = Path(__file__).parent.parent / "data" / "fl_dor_use_codes.json"
+    if path.exists():
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+_DOR_USE_CODES: Dict[str, Any] = {}
+
+
+def lookup_dor_use_code(raw: str) -> str:
+    """
+    Given a raw DOR land use string from a property appraiser system
+    (e.g. '48 WAREHOUSING' or '048' or '0048 Warehousing...'), extract
+    the DOR code number and return a formatted string:
+        '048 — Warehousing, distribution terminals... (Industrial)'
+    Falls back to cleaning the raw string if no match found.
+    """
+    global _DOR_USE_CODES
+    if not _DOR_USE_CODES:
+        _DOR_USE_CODES = _load_dor_use_codes()
+
+    if not raw:
         return ""
-    text = land_use_text.strip()
-    if text and text[0].isdigit():
-        parts = text.split(" ", 1)
-        if len(parts) > 1:
-            return parts[1].strip()
+    text = raw.strip()
+
+    # Extract leading numeric code (1-3 digits)
+    m = re.match(r'^(\d{1,3})\b', text)
+    if m:
+        code_num = m.group(1).zfill(3)  # zero-pad to 3 digits
+        entry = _DOR_USE_CODES.get(code_num)
+        if entry:
+            category = entry.get("category", "")
+            desc = entry["description"]
+            if category:
+                return f"{code_num} — {desc} ({category})"
+            return f"{code_num} — {desc}"
+        # Code found but not in our table — return cleaned text
+        rest = text[m.end():].strip()
+        return f"{code_num} — {rest}" if rest else code_num
+
+    # No leading code — return as-is, cleaned
     return text
+
+
+# Keep old name as alias for backward compatibility
+def strip_dor_code(land_use_text: str) -> str:
+    return lookup_dor_use_code(land_use_text)
+
 
 
 def get_resilient_session() -> requests.Session:

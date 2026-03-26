@@ -1,0 +1,246 @@
+{
+  "_source": "City of St. Petersburg Land Development Regulations (LDR), Chapter 16 — Zoning Districts. Verify all standards against current adopted code at stpete.org/ldr",
+
+  "DC-1": {
+    "name": "Downtown Center",
+    "category": "Downtown",
+    "allowed_uses_summary": "Residential, hotel, office, retail, restaurant, entertainment, civic — full mix of uses",
+    "min_lot_area": "None",
+    "min_lot_area_sf": null,
+    "min_lot_width": null,
+    "setback_front": 0,
+    "setback_side_interior": 0,
+    "setback_rear": 0,
+    "max_height": 400,
+    "max_far": 10.0,
+    "notes": "Build-to lines apply per the Downtown Streetscape Plan. Height up to 400 ft; specific limits vary by sub-area — confirm with CDB/Planning. FAR bonuses available through CRA and TDR programs. Design standards required. Verify current sub-district height maps with City of St. Pete Planning."
+  },
+
+  "DC-2": {
+    "name": "Downtown Connector",
+    "category": "Downtown",
+    "allowed_uses_summary": "Mixed-use: residential, office, retail, hotel along linear connecting corridors",
+    "min_lot_area": "None",
+    "min_lot_area_sf": null,
+    "min_lot_width": null,
+    "setback_front": 0,
+    "setback_side_interior": 0,
+    "setback_rear": 0,
+    "max_height": 150,
+    "max_far": 5.0,
+    "notes": "Connects downtown core to adjacent neighborhoods. Build-to lines apply. Stepbacks above certain floor heights may be required per design standards."
+  },
+
+  "DC-3": {
+    "name": "Downtown Neighborhood",
+    "category": "Downtown",
+    "allowed_uses_summary": "Residential, limited neighborhood-scale retail and office; transitional downtown edge",
+    "min_lot_area": "5,000 sf",
+    "min_lot_area_sf": 5000,
+    "min_lot_width": null,
+    "setback_front": 5,
+    "setback_side_interior": 5,
+    "setback_rear": 10,
+    "max_height": 65,
+    "max_far": 3.0,
+    "notes": "Transitional zone between downtown core and residential neighborhoods. Design standards apply."
+  },
+
+  "DC-4": {
+    "name": "Downtown Edge",
+    "category": "Downtown",
+    "allowed_uses_summary": "Predominantly residential with small-scale neighborhood commercial at ground floor",
+    "min_lot_area": "5,000 sf",
+    "min_lot_area_sf": 5000,
+    "min_lot_width": null,
+    "setback_front": 10,
+    "setback_side_interior": 5,
+    "setback_rear": 15,
+    "max_height": 45,
+    "max_far": 1.5,
+    "notes": "Outer edge of the downtown zoning overlay. Designed to preserve neighborhood character while allowing modest intensification."
+  },
+
+  "NT-1": {
+    "name": "Neighborhood Traditional 1",
+    "category": "Residential",
+    "allowed_uses_summary": "Single-family residential; accessory dwelling units per LDR",
+    "min_lot_area": "6,000 sf (some sub-areas 5,000 sf)",
+    "min_lot_area_sf": 6000,
+    "min_lot_width": "50 ft",
+    "setback_front": 20,
+    "setback_side_interior": 5,
+    "setback_side_street": 10,
+    "setback_rear": 15,
+    "max_height": 35,
+    "max_far": 0.4,
+    "notes": "Most restrictive single-family neighborhood district. Preserves traditional lot patterns. Verify minimum lot area with specific sub-area standards in the LDR."
+  },
+
+  "NT-2": {
+    "name": "Neighborhood Traditional 2",
+    "category": "Residential",
+    "allowed_uses_summary": "Single-family and duplex residential; ADUs permitted",
+    "min_lot_area": "5,000 sf",
+    "min_lot_area_sf": 5000,
+    "min_lot_width": "50 ft",
+    "setback_front": 20,
+    "setback_side_interior": 5,
+    "setback_side_street": 10,
+    "setback_rear": 10,
+    "max_height": 35,
+    "max_far": 0.5,
+    "notes": "Single-family with limited residential intensification. Duplexes permitted on qualifying lots."
+  },
+
+  "NT-3": {
+    "name": "Neighborhood Traditional 3",
+    "category": "Residential",
+    "allowed_uses_summary": "Single-family, duplex, triplex, townhouses; higher residential density",
+    "min_lot_area": "3,000 sf per unit",
+    "min_lot_area_sf": 3000,
+    "min_lot_width": "30 ft",
+    "setback_front": 15,
+    "setback_side_interior": 3,
+    "setback_side_street": 10,
+    "setback_rear": 10,
+    "max_height": 40,
+    "max_far": 0.6,
+    "notes": "Higher-intensity traditional neighborhood district allowing small attached residential. Per-unit lot area applies."
+  },
+
+  "NE": {
+    "name": "Neighborhood Edge",
+    "category": "Residential / Mixed Use",
+    "allowed_uses_summary": "Multi-family residential, limited neighborhood commercial; transitional between residential and commercial corridors",
+    "min_lot_area": "3,000 sf",
+    "min_lot_area_sf": 3000,
+    "min_lot_width": "30 ft",
+    "setback_front": 10,
+    "setback_side_interior": 5,
+    "setback_rear": 10,
+    "max_height": 55,
+    "max_far": 1.5,
+    "notes": "Transitional district at the edge of residential neighborhoods adjacent to commercial corridors."
+  },
+
+  "NMX": {
+    "name": "Neighborhood Mixed Use",
+    "category": "Mixed Use",
+    "allowed_uses_summary": "Ground-floor retail/service, upper-floor residential or office; neighborhood-serving commercial",
+    "min_lot_area": "3,000 sf",
+    "min_lot_area_sf": 3000,
+    "min_lot_width": "30 ft",
+    "setback_front": 0,
+    "setback_side_interior": 0,
+    "setback_rear": 5,
+    "max_height": 55,
+    "max_far": 2.0,
+    "notes": "Encourages pedestrian-oriented neighborhood commercial nodes. Ground floor active use required on primary street frontage."
+  },
+
+  "CMX-1": {
+    "name": "Commercial Mixed Use 1",
+    "category": "Commercial / Mixed Use",
+    "allowed_uses_summary": "Retail, office, personal service, residential above ground floor; neighborhood and community commercial",
+    "min_lot_area": "3,000 sf",
+    "min_lot_area_sf": 3000,
+    "min_lot_width": "30 ft",
+    "setback_front": 0,
+    "setback_side_interior": 0,
+    "setback_rear": 5,
+    "max_height": 55,
+    "max_far": 2.5,
+    "notes": "Lower-intensity commercial corridor district. Active ground floor street frontage standards apply. Parking requirements may be reduced in certain overlay areas."
+  },
+
+  "CMX-2": {
+    "name": "Commercial Mixed Use 2",
+    "category": "Commercial / Mixed Use",
+    "allowed_uses_summary": "Broad mix of retail, office, hotel, multi-family residential; community-scale commercial",
+    "min_lot_area": "3,000 sf",
+    "min_lot_area_sf": 3000,
+    "min_lot_width": "30 ft",
+    "setback_front": 0,
+    "setback_side_interior": 0,
+    "setback_rear": 5,
+    "max_height": 85,
+    "max_far": 4.0,
+    "notes": "Mid-intensity commercial mixed-use. Design standards for streetwall and ground floor activation. Taller buildings may require stepbacks above certain floors."
+  },
+
+  "CMX-3": {
+    "name": "Commercial Mixed Use 3",
+    "category": "Commercial / Mixed Use",
+    "allowed_uses_summary": "High-intensity mixed use: major retail, office, hotel, residential; regional commercial nodes",
+    "min_lot_area": "3,000 sf",
+    "min_lot_area_sf": 3000,
+    "min_lot_width": "30 ft",
+    "setback_front": 0,
+    "setback_side_interior": 0,
+    "setback_rear": 5,
+    "max_height": 150,
+    "max_far": 6.0,
+    "notes": "Highest-intensity commercial mixed-use zone outside downtown. Regional-scale uses permitted. Stepback requirements above certain floor heights. Design review required."
+  },
+
+  "IL": {
+    "name": "Industrial Light",
+    "category": "Industrial",
+    "allowed_uses_summary": "Light manufacturing, warehouse, flex office, research and development, limited retail",
+    "min_lot_area": "5,000 sf",
+    "min_lot_area_sf": 5000,
+    "min_lot_width": "50 ft",
+    "setback_front": 25,
+    "setback_side_interior": 10,
+    "setback_rear": 15,
+    "max_height": 50,
+    "max_far": 1.5,
+    "notes": "Light industrial uses compatible with adjacent residential or commercial areas. Outdoor storage limited. Buffering required adjacent to residential."
+  },
+
+  "IG": {
+    "name": "Industrial General",
+    "category": "Industrial",
+    "allowed_uses_summary": "General manufacturing, warehousing, heavy commercial, utility facilities",
+    "min_lot_area": "10,000 sf",
+    "min_lot_area_sf": 10000,
+    "min_lot_width": "75 ft",
+    "setback_front": 25,
+    "setback_side_interior": 10,
+    "setback_rear": 20,
+    "max_height": 75,
+    "max_far": 2.0,
+    "notes": "General industrial district. Outdoor storage permitted with screening. Heavier uses require additional buffering and review."
+  },
+
+  "P": {
+    "name": "Public / Quasi-Public",
+    "category": "Public / Civic",
+    "allowed_uses_summary": "Government facilities, civic uses, schools, hospitals, parks, utilities, places of worship",
+    "min_lot_area": "None specified",
+    "min_lot_area_sf": null,
+    "min_lot_width": null,
+    "setback_front": 25,
+    "setback_side_interior": 15,
+    "setback_rear": 20,
+    "max_height": 65,
+    "max_far": 1.5,
+    "notes": "Standards vary by specific use and CDB approval. Institutional uses may exceed height with special exception. Confirm requirements with City of St. Pete Planning."
+  },
+
+  "BP": {
+    "name": "Business Park",
+    "category": "Employment",
+    "allowed_uses_summary": "Office, flex office, limited light manufacturing, R&D; campus-style employment",
+    "min_lot_area": "10,000 sf",
+    "min_lot_area_sf": 10000,
+    "min_lot_width": "75 ft",
+    "setback_front": 30,
+    "setback_side_interior": 15,
+    "setback_rear": 20,
+    "max_height": 55,
+    "max_far": 1.5,
+    "notes": "Intended for campus employment environments. Landscaping and design standards apply. Retail limited to serving on-site employees."
+  }
+}
