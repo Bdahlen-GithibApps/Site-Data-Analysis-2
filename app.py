@@ -249,6 +249,11 @@ def build_requirements_markdown() -> str:
             "City of St. Petersburg Land Development Regulations (LDR), Chapter 16 — Zoning Districts · "
             "City of St. Petersburg Comprehensive Plan — Future Land Use Element · stpete.org/ldr"
         )
+    elif county == "Pasco":
+        lines.append(
+            "Pasco County Land Development Code (LDC) — Chapters 500–522 Zoning Districts · "
+            "Pasco County Comprehensive Plan — Future Land Use Element · library.municode.com/fl/pasco_county"
+        )
     else:
         jurisdiction = _zoning_agent.get_jurisdiction_name(county, city)
         lines.append(
