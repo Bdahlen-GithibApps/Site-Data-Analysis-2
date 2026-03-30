@@ -200,8 +200,68 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Error querying PCPAO API: {str(exc)}"}
 
 
+def _pasco_spatial_lookup(session: requests.Session, cx: float, cy: float) -> Dict[str, str]:
+    """Given a parcel centroid (web mercator), return zoning and FLUM codes."""
+    geom = json.dumps({"x": cx, "y": cy, "spatialReference": {"wkid": 102100}})
+    params = {
+        "geometry": geom,
+        "geometryType": "esriGeometryPoint",
+        "spatialRel": "esriSpatialRelIntersects",
+        "inSR": "102100",
+        "returnGeometry": "false",
+        "f": "json",
+    }
+
+    zoning_code = ""
+    zoning_desc = ""
+    flum_code = ""
+    flum_desc = ""
+
+    try:
+        rz = session.get(
+            "https://services6.arcgis.com/Mo4MddfRHpFwT7UF/arcgis/rest/services/Zoning_Areas/FeatureServer/9/query",
+            params={**params, "outFields": "ZONEID,ZN_TYPE"},
+            timeout=15,
+        )
+        zfeats = rz.json().get("features", [])
+        if zfeats:
+            zone_id = zfeats[0]["attributes"].get("ZONEID")
+            zoning_code = str(zfeats[0]["attributes"].get("ZN_TYPE") or "").strip()
+            if zone_id:
+                rd = session.get(
+                    "https://services6.arcgis.com/Mo4MddfRHpFwT7UF/arcgis/rest/services/Zoning_Areas/FeatureServer/10/query",
+                    params={"where": f"ZONEID={zone_id}", "outFields": "ZN_TYPE,ZN_DESC", "returnGeometry": "false", "f": "json"},
+                    timeout=15,
+                )
+                dfeats = rd.json().get("features", [])
+                if dfeats:
+                    zoning_desc = str(dfeats[0]["attributes"].get("ZN_DESC") or "").strip()
+    except Exception:
+        pass
+
+    try:
+        rf = session.get(
+            "https://services6.arcgis.com/Mo4MddfRHpFwT7UF/arcgis/rest/services/Future_Landuse_2025/FeatureServer/7/query",
+            params={**params, "outFields": "FLU_CODE,DESCRIPTION"},
+            timeout=15,
+        )
+        ffeats = rf.json().get("features", [])
+        if ffeats:
+            flum_code = str(ffeats[0]["attributes"].get("FLU_CODE") or "").strip()
+            flum_desc = str(ffeats[0]["attributes"].get("DESCRIPTION") or "").strip()
+    except Exception:
+        pass
+
+    return {
+        "zoning": zoning_code,
+        "zoning_description": zoning_desc,
+        "future_land_use": flum_code,
+        "flum_description": flum_desc,
+    }
+
+
 def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
-    """Fetch parcel data from Pasco County ArcGIS REST service."""
+    """Fetch parcel data from Pasco County ArcGIS REST service, including zoning and FLUM."""
     session = get_resilient_session()
     url = "https://maps.pascopa.com/arcgis/rest/services/Parcels/MapServer/3/query"
     pid = parcel_id.strip()
@@ -212,7 +272,7 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
             params={
                 "where": where,
                 "outFields": "NAD_NAME_1,NAD_NAME_2,PHYS_STREET,PHYS_CITY,PHYS_STATE,PHYS_ZIP,TR_AC,VAL_ACRES,DIR_CLASS",
-                "returnGeometry": "false",
+                "returnGeometry": "true",
                 "f": "json",
             },
             timeout=15,
@@ -222,7 +282,8 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
         features = d.get("features", [])
         if not features:
             return {"success": False, "error": "Parcel not found in Pasco County records"}
-        a = features[0].get("attributes", {})
+        feat = features[0]
+        a = feat.get("attributes", {})
 
         owner_parts = [str(a.get("NAD_NAME_1") or "").strip(), str(a.get("NAD_NAME_2") or "").strip()]
         owner = " ".join(p for p in owner_parts if p)
@@ -244,6 +305,15 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
         dir_class = str(a.get("DIR_CLASS") or "").strip().zfill(3)
         land_use = lookup_dor_use_code(dir_class)
 
+        # Spatial zoning + FLUM lookup using parcel centroid
+        spatial = {}
+        rings = (feat.get("geometry") or {}).get("rings", [[]])
+        pts = rings[0] if rings else []
+        if pts:
+            cx = sum(p[0] for p in pts) / len(pts)
+            cy = sum(p[1] for p in pts) / len(pts)
+            spatial = _pasco_spatial_lookup(session, cx, cy)
+
         return {
             "success": True,
             "parcel_id": pid,
@@ -254,6 +324,7 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
             "land_use": land_use,
             "site_area_sqft": "",
             "site_area_acres": acres_str,
+            **spatial,
         }
     except Exception as exc:
         return {"success": False, "error": f"Error querying Pasco ArcGIS: {str(exc)}"}

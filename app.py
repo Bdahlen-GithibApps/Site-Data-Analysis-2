@@ -543,17 +543,41 @@ def render_tab_lookup() -> None:
                         ui_refs["land_use"].value = enriched
                         ui_refs["land_use"].update()
 
+                    # Auto-populate zoning + FLUM from spatial lookup (Pasco only)
+                    if county == "Pasco":
+                        zoning_val = result.get("zoning", "") or ""
+                        flu_val = result.get("future_land_use", "") or ""
+                        zoning_desc = result.get("zoning_description", "") or ""
+                        flum_desc = result.get("flum_description", "") or ""
+                        if zoning_val:
+                            set_field("zoning", zoning_val)
+                            if "zoning_select" in ui_refs:
+                                ui_refs["zoning_select"].value = zoning_val
+                                ui_refs["zoning_select"].update()
+                        if flu_val:
+                            set_field("future_land_use", flu_val)
+                            if "flu_select" in ui_refs:
+                                ui_refs["flu_select"].value = flu_val
+                                ui_refs["flu_select"].update()
+                        label_parts = []
+                        if zoning_val:
+                            label_parts.append(f"Zoning: {zoning_val}" + (f" — {zoning_desc}" if zoning_desc else ""))
+                        if flu_val:
+                            label_parts.append(f"FLU: {flu_val}" + (f" — {flum_desc}" if flum_desc else ""))
+                        if "zoning_city_label" in ui_refs:
+                            ui_refs["zoning_city_label"].text = " · ".join(label_parts) if label_parts else "Zoning/FLU not found for this parcel."
+                            ui_refs["zoning_city_label"].update()
+                    else:
+                        if "zoning_city_label" in ui_refs:
+                            detected_city = state.get("city", "")
+                            ui_refs["zoning_city_label"].text = (
+                                f"City detected: {detected_city} — open the zoning map above, "
+                                "find the zoning code, then enter it below."
+                            )
+                            ui_refs["zoning_city_label"].update()
+
                     refresh_all()
                     ui.notify("Property data retrieved.", type="positive")
-
-                    # Update zoning city label so user knows which map to open
-                    if "zoning_city_label" in ui_refs:
-                        detected_city = state.get("city", "")
-                        ui_refs["zoning_city_label"].text = (
-                            f"City detected: {detected_city} — open the zoning map above, "
-                            "find the zoning code, then enter it below."
-                        )
-                        ui_refs["zoning_city_label"].update()
 
                     # Auto-run infrastructure lookup using the resolved address + city
                     ui.notify("Fetching infrastructure data...", type="info")
