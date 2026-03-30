@@ -198,3 +198,62 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
         }
     except Exception as exc:
         return {"success": False, "error": f"Error querying PCPAO API: {str(exc)}"}
+
+
+def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
+    """Fetch parcel data from Pasco County ArcGIS REST service."""
+    session = get_resilient_session()
+    url = "https://maps.pascopa.com/arcgis/rest/services/Parcels/MapServer/3/query"
+    pid = parcel_id.strip()
+    where = f"ParcelID='{pid.replace(chr(39), chr(39)+chr(39))}'"
+    try:
+        r = session.get(
+            url,
+            params={
+                "where": where,
+                "outFields": "NAD_NAME_1,NAD_NAME_2,PHYS_STREET,PHYS_CITY,PHYS_STATE,PHYS_ZIP,TR_AC,VAL_ACRES,DIR_CLASS",
+                "returnGeometry": "false",
+                "f": "json",
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+        d = r.json()
+        features = d.get("features", [])
+        if not features:
+            return {"success": False, "error": "Parcel not found in Pasco County records"}
+        a = features[0].get("attributes", {})
+
+        owner_parts = [str(a.get("NAD_NAME_1") or "").strip(), str(a.get("NAD_NAME_2") or "").strip()]
+        owner = " ".join(p for p in owner_parts if p)
+
+        street = str(a.get("PHYS_STREET") or "").strip()
+        city = str(a.get("PHYS_CITY") or "").strip().title()
+        state = str(a.get("PHYS_STATE") or "FL").strip() or "FL"
+        zip_code = str(a.get("PHYS_ZIP") or "").strip()
+        address_parts = [street, city, f"{state} {zip_code}".strip()]
+        address = ", ".join(p for p in address_parts if p)
+
+        acres_raw = a.get("TR_AC") if a.get("TR_AC") is not None else a.get("VAL_ACRES")
+        try:
+            acres = float(acres_raw or 0)
+            acres_str = f"{acres:.2f}" if acres else ""
+        except Exception:
+            acres_str = str(acres_raw or "")
+
+        dir_class = str(a.get("DIR_CLASS") or "").strip().zfill(3)
+        land_use = lookup_dor_use_code(dir_class)
+
+        return {
+            "success": True,
+            "parcel_id": pid,
+            "owner": owner,
+            "address": address,
+            "city": city,
+            "zip": zip_code,
+            "land_use": land_use,
+            "site_area_sqft": "",
+            "site_area_acres": acres_str,
+        }
+    except Exception as exc:
+        return {"success": False, "error": f"Error querying Pasco ArcGIS: {str(exc)}"}

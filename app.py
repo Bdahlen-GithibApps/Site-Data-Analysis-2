@@ -24,7 +24,7 @@ from agents.parking_agent import ParkingAgent
 from agents.landscape_agent import LandscapeAgent
 from agents.infrastructure_agent import InfrastructureAgent
 from agents.environmental_agent import EnvironmentalAgent
-from tools.scraper import scrape_pinellas_property, expand_city_name, lookup_dor_use_code
+from tools.scraper import scrape_pinellas_property, scrape_pasco_property, expand_city_name, lookup_dor_use_code
 from tools.helpers import (
     safe_float,
     safe_int,
@@ -503,12 +503,11 @@ def render_tab_lookup() -> None:
                     if not is_valid:
                         ui.notify(error_msg, type="negative")
                         return
-                    if county != "Pinellas":
-                        ui.notify("Property lookup is only implemented for Pinellas County right now.", type="warning")
-                        return
-
                     ui.notify("Fetching property data...", type="info")
-                    result = scrape_pinellas_property(parcel_id)
+                    if county == "Pasco":
+                        result = scrape_pasco_property(parcel_id)
+                    else:
+                        result = scrape_pinellas_property(parcel_id)
                     if not result.get("success"):
                         ui.notify(result.get("error", "Lookup failed"), type="negative")
                         return
