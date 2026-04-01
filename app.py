@@ -45,6 +45,37 @@ _landscape_agent = LandscapeAgent()
 _infra_agent = InfrastructureAgent()
 _env_agent = EnvironmentalAgent()
 
+
+def _build_parcel_links(county: str, parcel_id: str, address: str, city: str) -> List[Dict[str, str]]:
+    """Return a list of {label, url} dicts for quick-access links relevant to the parcel."""
+    fema_query = f"{address} {city}".replace(" ", "%20")
+    fema_url = f"https://msc.fema.gov/portal/search?AddressQuery={fema_query}#searchresultsanchor"
+    links = []
+    if county == "Pasco":
+        # Pasco County Property Appraiser
+        links.append({"label": "Property Appraiser", "url": f"https://pascopa.com/parcel/?parcelid={parcel_id}"})
+        # Pasco GIS / Parcel Map
+        links.append({"label": "Parcel Map (GIS)", "url": f"https://maps.pascopa.com/Html5Viewer/?viewer=pasco&find={parcel_id}"})
+        # Pasco Clerk of Court deed search
+        links.append({"label": "Deed / OR Records", "url": f"https://pascoclerk.com/official-records-search/?SearchType=parcel&Parcel={parcel_id}"})
+        # Pasco Development Services
+        links.append({"label": "Development Services", "url": "https://pascogov.com/developmentservices"})
+    else:
+        # Pinellas County Property Appraiser
+        pid_clean = parcel_id.replace("-", "")
+        links.append({"label": "Property Appraiser", "url": f"https://www.pcpao.gov/general.php?parcel={pid_clean}"})
+        # Pinellas County GIS
+        links.append({"label": "Parcel Map (GIS)", "url": f"https://egis.pinellascounty.org/Html5Viewer/?viewer=pcgis&find={parcel_id}"})
+        # Pinellas Clerk of Court deed search
+        links.append({"label": "Deed / OR Records", "url": f"https://officialrecords.mypinellasclerk.org/search/SearchTypeParcel?ParcelID={pid_clean}"})
+        # Pinellas Building / DRS
+        links.append({"label": "Building & DRS", "url": "https://pinellascounty.org/build/"})
+    # FEMA flood map — same for all counties
+    links.append({"label": "FEMA Flood Map", "url": fema_url})
+    # SWFWMD ePermitting
+    links.append({"label": "SWFWMD ePermitting", "url": "https://www.swfwmd.state.fl.us/permits/epermitting"})
+    return links
+
 # ──────────────────────────────────────────────────────────────────────
 # App state
 # ──────────────────────────────────────────────────────────────────────
@@ -579,12 +610,14 @@ def render_tab_lookup() -> None:
                         if zoning_val:
                             set_field("zoning", zoning_val)
                             if "zoning_select" in ui_refs:
-                                ui_refs["zoning_select"].value = zoning_val
+                                zoning_display = f"{zoning_val} — {zoning_desc}" if zoning_desc else zoning_val
+                                ui_refs["zoning_select"].value = zoning_display
                                 ui_refs["zoning_select"].update()
                         if flu_val:
                             set_field("future_land_use", flu_val)
                             if "flu_select" in ui_refs:
-                                ui_refs["flu_select"].value = flu_val
+                                flu_display = f"{flu_val} — {flum_desc}" if flum_desc else flu_val
+                                ui_refs["flu_select"].value = flu_display
                                 ui_refs["flu_select"].update()
                         label_parts = []
                         if zoning_val:
@@ -646,6 +679,24 @@ def render_tab_lookup() -> None:
                         zone_msg = f" (FEMA Zone {flood_zone})" if flood_zone else ""
                         ui.notify(f"Environmental data populated{zone_msg}.", type="positive")
 
+                    # Populate Quick Links
+                    links_row_ref = ui_refs.get("_links_row")
+                    if links_row_ref is not None:
+                        links_row_ref.clear()
+                        parcel_links = _build_parcel_links(
+                            county,
+                            parcel_id,
+                            state.get("address", ""),
+                            state.get("city", ""),
+                        )
+                        with links_row_ref:
+                            for lnk in parcel_links:
+                                ui.button(
+                                    lnk["label"],
+                                    on_click=lambda _, u=lnk["url"]: ui.navigate.to(u, new_tab=True),
+                                    icon="open_in_new",
+                                ).props("outline dense").classes("link-btn")
+
                 ui.button("LOOKUP PROPERTY DATA", on_click=do_lookup, color="primary").classes("q-mt-md w-full")
 
             # Lookup summary
@@ -672,7 +723,13 @@ def render_tab_lookup() -> None:
                 for key in ("tax_parcel", "site_views", "adjoining_uses", "proposed_zoning"):
                     ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
 
-        # RIGHT COLUMN — Zoning + FLU inputs
+            # Quick Links — populated after lookup
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Quick Links").classes("section-title")
+                links_row = ui.row().classes("w-full flex-wrap gap-2 q-mt-xs")
+                ui_refs["_links_row"] = links_row
+                with links_row:
+                    ui.label("Look up a parcel to generate links.").classes("muted")
         with ui.column().classes("col-6"):
             with ui.card().classes("section-card w-full"):
                 ui.label("Zoning & Land Use").classes("section-title")
@@ -969,42 +1026,97 @@ def render_tab_environmental() -> None:
                 _sir_input("Fire Route Considerations", "fire_route", "e.g. N/A")
 
 
+def _load_fees_data(county: str) -> dict:
+    """Load fees.json for the given county. Returns empty dict if not found."""
+    import json, pathlib
+    path = pathlib.Path(__file__).parent / "data" / county.lower() / "fees.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
 def render_tab_fees_schedule() -> None:
+    county = state.get("county", "Pinellas")
+    city = state.get("city", "")
     ui.label("Fees & Schedule").classes("text-h5 q-mb-md")
 
-    with ui.row().classes("w-full items-start no-wrap gap-8"):
-        with ui.column().classes("col-6"):
-            with ui.card().classes("section-card w-full"):
-                ui.label("Impact / User Fees").classes("section-title")
-                _sir_input("Fire Plan Review", "fee_fire_plan_review", "e.g. $75")
-                _sir_input("Building Plan Review", "fee_bldg_plan_review", "e.g. $50")
-                _sir_input("Site Plan Review (POD)", "fee_site_plan_review", "e.g. $500")
+    # Label lookup for fee section keys
+    _FEE_LABELS = {
+        "application_fees":   "Application & Permit Fees",
+        "impact_fees":        "Impact Fees",
+        "pre_app":            "Pre-Application Meeting",
+        "perm_steps":         "Permitting Steps",
+        "local_permits":      "Local Permitting (County / City)",
+        "wmd":                "SWFWMD Permitting",
+        "fdep":               "FDEP Permitting",
+        "fdot":               "FDOT Permitting",
+        "dedication":         "ROW Dedication / Easements",
+        "securities":         "Securities & Utility Connection Fees",
+        "coastal_dev_permit": "Coastal Development Permit",
+        "entitlements":       "Entitlements Process",
+        "lot_line":           "Lot Line / Subdivision",
+        "staff_meetings":     "Required Staff Meetings",
+        "public_meetings":    "Required Public Meetings",
+    }
 
-            with ui.card().classes("section-card q-mt-md w-full"):
-                ui.label("Application / Permit Fees").classes("section-title")
-                _sir_input("Building Permit", "fee_bldg_permit", "e.g. $750")
-                _sir_input("Demolition Permit", "fee_demo_permit", "e.g. $250 (>5,000 sf)")
-                _sir_input("Dedication", "fee_dedication", "e.g. N/A")
-                _sir_input("Securities (Landscape / Utilities)", "fee_securities", "e.g. N/A")
-                _sir_input("Lot Line Adjustment", "fee_lot_line_adj", "e.g. Prelim $1,000 / Final $1,000")
-                _sir_input("Pre-Application Review", "fee_pre_app", "e.g. $238")
-                _sir_input("Coastal Development Permit", "fee_coastal_dev", "e.g. N/A")
+    # Header row: jurisdiction info + fetch button
+    with ui.row().classes("w-full items-center gap-4 q-mb-md"):
+        jurisdiction_label = ui.label("").classes("muted")
+        fetch_btn = ui.button("FETCH FEES", icon="search")
 
-        with ui.column().classes("col-6"):
-            with ui.card().classes("section-card w-full"):
-                ui.label("Permitting Schedule").classes("section-title")
-                _sir_input("Lot Line Adjustment Timing", "sched_lot_line_adj", "e.g. Concurrent with site plan")
-                _sir_textarea("Entitlements Process", "sched_entitlements")
-                _sir_textarea("Permitting Steps", "sched_perm_steps")
+    # Scrollable results area
+    results_area = ui.column().classes("w-full gap-2")
 
-            with ui.card().classes("section-card q-mt-md w-full"):
-                ui.label("Agency Review Timelines").classes("section-title")
-                _sir_textarea("Local (City / County)", "sched_local")
-                _sir_textarea("WMD Permitting", "sched_wmd")
-                _sir_textarea("FDEP Permitting", "sched_fdep")
-                _sir_textarea("FDOT Permitting", "sched_fdot")
-                _sir_input("Required Municipal Staff Meetings", "sched_staff_meetings")
-                _sir_input("Required Municipal Public Meetings", "sched_public_meetings")
+    def do_fetch_fees() -> None:
+        current_county = state.get("county", "Pinellas")
+        current_city = state.get("city", "")
+        fees = _load_fees_data(current_county)
+        results_area.clear()
+
+        if not fees:
+            with results_area:
+                ui.label(f"No fee data available for {current_county} County.").classes("muted")
+            return
+
+        source = fees.get("_source", "")
+        note = fees.get("_note", "")
+        jurisdiction = fees.get("_jurisdiction", f"{current_county} County")
+
+        jurisdiction_label.text = f"{jurisdiction}" + (f" — {current_city}" if current_city else "")
+        jurisdiction_label.update()
+
+        with results_area:
+            if source:
+                ui.label(f"Source: {source}").classes("muted text-caption")
+            if note:
+                ui.label(f"Note: {note}").classes("muted text-caption q-mb-sm")
+
+            for key in fees.get("_sections", list(_FEE_LABELS.keys())):
+                label = _FEE_LABELS.get(key, key.replace("_", " ").title())
+                content = fees.get(key, "")
+                if not content:
+                    continue
+                with ui.expansion(label, icon="attach_money").classes("w-full fee-expansion"):
+                    # Render each line as a paragraph for readability
+                    for line in content.strip().split("\n"):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.endswith(":") or (line.startswith("  —") is False and ":" not in line and len(line) < 60):
+                            ui.label(line).classes("text-weight-bold q-mt-xs")
+                        else:
+                            ui.label(line).classes("fee-line")
+
+        ui.notify(f"Fee schedule loaded for {current_county} County.", type="positive")
+
+    fetch_btn.on("click", do_fetch_fees)
+
+    # Auto-load if county is already set
+    if state.get("county"):
+        do_fetch_fees()
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1140,6 +1252,10 @@ ui.add_css(
     .code-field { width: 500px !important; max-width: 500px !important; }
     .code-field .q-field__control { width: 500px !important; }
     .code-field input { width: 500px !important; }
+    .fee-expansion { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 4px; }
+    .fee-expansion .q-expansion-item__content { padding: 8px 16px 12px; }
+    .fee-line { font-size: 0.85rem; color: #2c3e50; padding: 1px 0; line-height: 1.5; white-space: pre-wrap; }
+    .link-btn { font-size: 0.8rem !important; text-transform: none !important; font-weight: 500; }
     """
 )
 
