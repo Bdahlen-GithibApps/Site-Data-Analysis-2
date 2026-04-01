@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 import re
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 import requests
 from bs4 import BeautifulSoup
@@ -762,6 +762,31 @@ PINELLAS_CITY_MAP = {
     "UNINCORPORATED": "Unincorporated Pinellas", "COUNTY": "Unincorporated Pinellas",
 }
 
+# Hillsborough County city name normalization
+HILLSBOROUGH_CITY_MAP = {
+    "TAMPA": "Tampa", "T": "Tampa",
+    "PLANT CITY": "Plant City", "PC": "Plant City",
+    "TEMPLE TERRACE": "Temple Terrace", "TT": "Temple Terrace",
+    "UNINCORPORATED": "Unincorporated Hillsborough",
+    "HILLSBOROUGH": "Unincorporated Hillsborough",
+}
+
+# Pasco County city name normalization
+PASCO_CITY_MAP = {
+    "NEW PORT RICHEY": "New Port Richey", "NPR": "New Port Richey",
+    "PORT RICHEY": "Port Richey", "PR": "Port Richey",
+    "DADE CITY": "Dade City", "DC": "Dade City",
+    "ZEPHYRHILLS": "Zephyrhills", "ZPH": "Zephyrhills",
+    "WESLEY CHAPEL": "Wesley Chapel", "WC": "Wesley Chapel",
+    "LAND O LAKES": "Land O' Lakes", "LAND O' LAKES": "Land O' Lakes", "LOL": "Land O' Lakes",
+    "SAN ANTONIO": "San Antonio",
+    "SAINT LEO": "Saint Leo", "ST LEO": "Saint Leo",
+    "HUDSON": "Hudson",
+    "HOLIDAY": "Holiday",
+    "UNINCORPORATED": "Unincorporated Pasco",
+    "PASCO": "Unincorporated Pasco",
+}
+
 
 def expand_city_name(city_abbr: str) -> str:
     if not city_abbr:
@@ -778,6 +803,43 @@ def strip_dor_code(land_use_text: str) -> str:
         if len(parts) > 1:
             return parts[1].strip()
     return text
+
+
+SQFT_PER_ACRE = 43560
+
+
+def get_first_valid(data: dict, *keys: str) -> str:
+    """Return the first non-empty string value found in ``data`` for ``keys``."""
+    for key in keys:
+        val = data.get(key)
+        if val not in (None, "", 0):
+            return str(val).strip()
+    return ""
+
+
+def parse_area_measurements(sqft_raw: Any, acres_raw: Any) -> Tuple[Optional[int], Optional[float]]:
+    """Parse square footage and acres from raw values, deriving one from the other.
+
+    Returns:
+        Tuple of (sqft: Optional[int], acres: Optional[float])
+    """
+    sqft = None
+    acres = None
+    try:
+        if sqft_raw not in (None, "", 0):
+            sqft = int(float(str(sqft_raw).replace(",", "")))
+    except (ValueError, TypeError):
+        pass
+    try:
+        if acres_raw not in (None, "", 0):
+            acres = float(str(acres_raw).replace(",", ""))
+    except (ValueError, TypeError):
+        pass
+    if sqft and not acres:
+        acres = round(sqft / SQFT_PER_ACRE, 4)
+    elif acres and not sqft:
+        sqft = int(acres * SQFT_PER_ACRE)
+    return sqft, acres
 
 
 def get_resilient_session() -> requests.Session:
@@ -872,6 +934,244 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
         }
     except Exception as exc:
         return {"success": False, "error": f"Error querying PCPAO API: {str(exc)}"}
+
+
+def scrape_hillsborough_property(parcel_id: str) -> Dict[str, Any]:
+    """Query Hillsborough County Property Appraiser (HCPA) data by folio number.
+
+    Primary source: HCPA ArcGIS REST API at gis.hcpafl.org.
+    Fallback: Web scraping propertysearch.hcpafl.org.
+    """
+    session = get_resilient_session()
+
+    # Normalize folio: strip spaces; allow alphanumeric, dots, and dashes
+    folio_clean = re.sub(r"[^A-Za-z0-9.\-]", "", parcel_id.strip())
+
+    # --- Primary: ArcGIS REST API ---
+    try:
+        api_url = (
+            "https://gis.hcpafl.org/arcgis/rest/services/Parcels/TaxParcel/MapServer/0/query"
+        )
+        params = {
+            "where": f"FOLIO='{folio_clean}'",
+            "outFields": "*",
+            "f": "json",
+        }
+        resp = session.get(api_url, params=params, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        features = data.get("features", [])
+        if features:
+            attrs = features[0].get("attributes", {})
+            # Extract fields — HCPA ArcGIS field names
+            address = get_first_valid(attrs, "SITEADDR", "SITE_ADDR", "SITUSADDR", "PROPERTY_ADDRESS")
+            city_raw = get_first_valid(attrs, "SITECITY", "SITE_CITY", "SITUSCITY", "CITY")
+            city = HILLSBOROUGH_CITY_MAP.get(city_raw.upper(), city_raw) if city_raw else ""
+            zip_code = get_first_valid(attrs, "SITEZIP", "SITE_ZIP", "SITUSZIP", "ZIP").split("-")[0]
+            owner = get_first_valid(attrs, "OWN1", "OWNER1", "OWNER_NAME", "OWNERNAME")
+            land_use = get_first_valid(attrs, "DORDESC", "DOR_DESC", "LANDUSE", "LAND_USE", "USEDESC", "USE_DESC")
+            legal_desc = get_first_valid(attrs, "LEGALDESC", "LEGAL_DESC", "LEGAL")
+            sqft_raw = get_first_valid(attrs, "LANDAREA", "LAND_AREA", "TOTAREA", "CALC_AREA")
+            acres_raw = get_first_valid(attrs, "LANDACRES", "LAND_ACRES", "ACRES", "TOTALACRES")
+            sqft, acres = parse_area_measurements(sqft_raw, acres_raw)
+
+            if address or owner:
+                return {
+                    "success": True, "parcel_id": folio_clean,
+                    "address": address, "city": city, "zip": zip_code,
+                    "owner": owner, "land_use": land_use,
+                    "site_area_sqft": f"{sqft:,}" if sqft else "",
+                    "site_area_acres": f"{acres:.2f}" if acres else "",
+                    "legal_description": legal_desc, "strap": folio_clean,
+                    "tax_district": city_raw,
+                }
+    except Exception as exc:
+        logger.warning("HCPA ArcGIS API failed: %s", exc)
+
+    # --- Fallback: propertysearch.hcpafl.org ---
+    try:
+        search_url = "https://propertysearch.hcpafl.org/HCPASearchEngine/api/search"
+        params = {"query": folio_clean, "searchType": "FOLIO"}
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://propertysearch.hcpafl.org/",
+        }
+        resp = session.get(search_url, params=params, headers=headers, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        results = data if isinstance(data, list) else data.get("results", data.get("data", []))
+        if results:
+            rec = results[0] if isinstance(results, list) else results
+            address = get_first_valid(rec, "siteAddress", "address", "propertyAddress")
+            city_raw = get_first_valid(rec, "siteCity", "city")
+            city = HILLSBOROUGH_CITY_MAP.get(city_raw.upper(), city_raw) if city_raw else ""
+            zip_code = get_first_valid(rec, "siteZip", "zip").split("-")[0]
+            owner = get_first_valid(rec, "ownerName", "owner")
+            land_use = get_first_valid(rec, "landUse", "useDescription")
+            legal_desc = get_first_valid(rec, "legalDescription", "legal")
+            sqft_raw = get_first_valid(rec, "landArea", "squareFeet")
+            acres_raw = get_first_valid(rec, "acres", "landAcres")
+            sqft, acres = parse_area_measurements(sqft_raw, acres_raw)
+
+            if address or owner:
+                return {
+                    "success": True, "parcel_id": folio_clean,
+                    "address": address, "city": city, "zip": zip_code,
+                    "owner": owner, "land_use": land_use,
+                    "site_area_sqft": f"{sqft:,}" if sqft else "",
+                    "site_area_acres": f"{acres:.2f}" if acres else "",
+                    "legal_description": legal_desc, "strap": folio_clean,
+                    "tax_district": city_raw,
+                }
+    except Exception as exc:
+        logger.warning("HCPA search API fallback failed: %s", exc)
+
+    return {"success": False, "error": "Parcel not found in Hillsborough County HCPA database"}
+
+
+def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
+    """Query Pasco County Property Appraiser data by parcel number.
+
+    Primary source: search.pascopa.com JSON API.
+    Fallback: search.pascopa.com HTML scraping.
+    """
+    session = get_resilient_session()
+
+    # Normalize parcel: Pasco format is XX-XX-XX-XXXX-XXXXX-XXXX
+    parcel_clean = re.sub(r"[^A-Za-z0-9\-]", "", parcel_id.strip())
+
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://search.pascopa.com/",
+    }
+
+    # --- Primary: Pasco JSON API (GetParcelDetails) ---
+    try:
+        detail_url = "https://search.pascopa.com/api/Parcel/GetParcelDetails"
+        params = {"parcelNumber": parcel_clean}
+        resp = session.get(detail_url, params=params, headers=headers, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if data and not data.get("error"):
+            address = get_first_valid(data, "propertyAddress", "siteAddress", "address")
+            city_raw = get_first_valid(data, "propertyCity", "siteCity", "city")
+            city = PASCO_CITY_MAP.get(city_raw.upper(), city_raw) if city_raw else ""
+            zip_code = get_first_valid(data, "propertyZip", "siteZip", "zip").split("-")[0]
+            owner = get_first_valid(data, "ownerName", "owner1Name", "owner")
+            land_use = get_first_valid(data, "landUseDescription", "useCode", "landUse")
+            legal_desc = get_first_valid(data, "legalDescription", "legal")
+            sqft_raw = get_first_valid(data, "landSquareFeet", "landArea", "squareFeet")
+            acres_raw = get_first_valid(data, "landAcres", "acres")
+            sqft, acres = parse_area_measurements(sqft_raw, acres_raw)
+
+            if address or owner:
+                return {
+                    "success": True, "parcel_id": parcel_clean,
+                    "address": address, "city": city, "zip": zip_code,
+                    "owner": owner, "land_use": land_use,
+                    "site_area_sqft": f"{sqft:,}" if sqft else "",
+                    "site_area_acres": f"{acres:.2f}" if acres else "",
+                    "legal_description": legal_desc, "strap": parcel_clean,
+                    "tax_district": city_raw,
+                }
+    except Exception as exc:
+        logger.warning("Pasco GetParcelDetails API failed: %s", exc)
+
+    # --- Secondary: Pasco search API (GetParcels) ---
+    try:
+        search_url = "https://search.pascopa.com/api/Search/GetParcels"
+        params = {"criteria": parcel_clean}
+        resp = session.get(search_url, params=params, headers=headers, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        results = data if isinstance(data, list) else data.get("parcels", data.get("results", []))
+        if results:
+            rec = results[0] if isinstance(results, list) else results
+            address = get_first_valid(rec, "propertyAddress", "siteAddress", "address")
+            city_raw = get_first_valid(rec, "propertyCity", "city")
+            city = PASCO_CITY_MAP.get(city_raw.upper(), city_raw) if city_raw else ""
+            zip_code = get_first_valid(rec, "propertyZip", "zip").split("-")[0]
+            owner = get_first_valid(rec, "ownerName", "owner")
+            land_use = get_first_valid(rec, "landUseDescription", "landUse")
+            legal_desc = get_first_valid(rec, "legalDescription", "legal")
+            sqft_raw = get_first_valid(rec, "landSquareFeet", "landArea")
+            acres_raw = get_first_valid(rec, "landAcres", "acres")
+            sqft, acres = parse_area_measurements(sqft_raw, acres_raw)
+
+            if address or owner:
+                return {
+                    "success": True, "parcel_id": parcel_clean,
+                    "address": address, "city": city, "zip": zip_code,
+                    "owner": owner, "land_use": land_use,
+                    "site_area_sqft": f"{sqft:,}" if sqft else "",
+                    "site_area_acres": f"{acres:.2f}" if acres else "",
+                    "legal_description": legal_desc, "strap": parcel_clean,
+                    "tax_district": city_raw,
+                }
+    except Exception as exc:
+        logger.warning("Pasco GetParcels search API failed: %s", exc)
+
+    # --- Fallback: HTML scraping of search.pascopa.com ---
+    try:
+        page_url = f"https://search.pascopa.com/parcel/{parcel_clean}"
+        resp = session.get(page_url, headers={**headers, "Accept": "text/html"}, timeout=20)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        txt = soup.get_text(" ", strip=True)
+        if parcel_clean.replace("-", "") in txt.replace("-", "").replace(" ", ""):
+            address = ""
+            city = ""
+            zip_code = ""
+            owner = ""
+            land_use = ""
+            legal_desc = ""
+            sqft_raw_str = ""
+            acres_raw_str = ""
+
+            addr_m = re.search(r"(?:Property Address|Site Address|Situs)[:\s]+([^\n,]+)", txt, re.IGNORECASE)
+            if addr_m:
+                address = addr_m.group(1).strip()
+            city_m = re.search(r"(?:City)[:\s]+([A-Za-z ]+?)(?:\s+FL|\s+\d{5})", txt, re.IGNORECASE)
+            if city_m:
+                city_raw = city_m.group(1).strip()
+                city = PASCO_CITY_MAP.get(city_raw.upper(), city_raw)
+            zip_m = re.search(r"(?:FL|Florida)\s+(\d{5})", txt, re.IGNORECASE)
+            if zip_m:
+                zip_code = zip_m.group(1)
+            owner_m = re.search(r"(?:Owner|Taxpayer)[:\s]+([^\n]+)", txt, re.IGNORECASE)
+            if owner_m:
+                owner = owner_m.group(1).strip()
+            lu_m = re.search(r"(?:Land Use|Use Description|Property Use)[:\s]+([^\n]+)", txt, re.IGNORECASE)
+            if lu_m:
+                land_use = lu_m.group(1).strip()
+            legal_m = re.search(r"(?:Legal Description|Legal)[:\s]+([^\n]+(?:\n[^\n]+){0,3})", txt, re.IGNORECASE)
+            if legal_m:
+                legal_desc = legal_m.group(1).strip()
+            area_m = re.search(r"([\d,]+)\s*(?:sq\.?\s*ft|square feet)", txt, re.IGNORECASE)
+            if area_m:
+                sqft_raw_str = area_m.group(1)
+            acres_m = re.search(r"([\d.]+)\s*acres", txt, re.IGNORECASE)
+            if acres_m:
+                acres_raw_str = acres_m.group(1)
+            sqft, acres = parse_area_measurements(sqft_raw_str, acres_raw_str)
+
+            if address or owner:
+                return {
+                    "success": True, "parcel_id": parcel_clean,
+                    "address": address, "city": city, "zip": zip_code,
+                    "owner": owner, "land_use": land_use,
+                    "site_area_sqft": f"{sqft:,}" if sqft else "",
+                    "site_area_acres": f"{acres:.2f}" if acres else "",
+                    "legal_description": legal_desc, "strap": parcel_clean,
+                    "tax_district": city,
+                }
+    except Exception as exc:
+        logger.warning("Pasco HTML fallback failed: %s", exc)
+
+    return {"success": False, "error": "Parcel not found in Pasco County Property Appraiser database"}
 
 
 # ---------------------------------------------------------------------
@@ -1017,6 +1317,23 @@ ZONING_MAP_URLS = {
     "Belleair Bluffs": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
     "South Pasadena": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
     "Kenneth City": "https://pinellas-egis.maps.arcgis.com/apps/InformationLookup/index.html?appid=d28c337acb184a3986bade031bcdb627",
+    # Hillsborough County
+    "Unincorporated Hillsborough": "https://maps.hcpafl.org/",
+    "Tampa": "https://maps.hcpafl.org/",
+    "Plant City": "https://maps.hcpafl.org/",
+    "Temple Terrace": "https://maps.hcpafl.org/",
+    # Pasco County
+    "Unincorporated Pasco": "https://maps.pascocountyfl.net/pascoviewer/",
+    "New Port Richey": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Port Richey": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Dade City": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Zephyrhills": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Wesley Chapel": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Land O' Lakes": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Hudson": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Holiday": "https://maps.pascocountyfl.net/pascoviewer/",
+    "San Antonio": "https://maps.pascocountyfl.net/pascoviewer/",
+    "Saint Leo": "https://maps.pascocountyfl.net/pascoviewer/",
 }
 
 # NOTE: Smaller beach communities and towns that don't have their own GIS
@@ -1349,12 +1666,14 @@ def render_tab_lookup() -> None:
                     if not is_valid:
                         ui.notify(error_msg, type="negative")
                         return
-                    if county != "Pinellas":
-                        ui.notify("Property lookup is only implemented for Pinellas County right now.", type="warning")
-                        return
 
                     ui.notify("Fetching property data...", type="info")
-                    result = scrape_pinellas_property(parcel_id)
+                    if county == "Hillsborough":
+                        result = scrape_hillsborough_property(parcel_id)
+                    elif county == "Pasco":
+                        result = scrape_pasco_property(parcel_id)
+                    else:
+                        result = scrape_pinellas_property(parcel_id)
                     if not result.get("success"):
                         ui.notify(result.get("error", "Lookup failed"), type="negative")
                         return
@@ -1376,8 +1695,11 @@ def render_tab_lookup() -> None:
                             ui_refs[state_key].value = val
                             ui_refs[state_key].update()
 
-                    # Expand city name
-                    state["city"] = expand_city_name(result.get("city", "") or "")
+                    # Expand city name (Pinellas only; other counties expand in their scraper)
+                    if county == "Pinellas":
+                        state["city"] = expand_city_name(result.get("city", "") or "")
+                    else:
+                        state["city"] = result.get("city", "") or ""
                     if "city" in ui_refs:
                         ui_refs["city"].value = state["city"]
                         ui_refs["city"].update()
