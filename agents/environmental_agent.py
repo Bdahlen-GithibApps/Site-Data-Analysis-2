@@ -107,7 +107,7 @@ class EnvironmentalAgent:
             logger.warning("CCCL query failed: %s", exc)
         return False
 
-    def _build_fields(self, flood: Dict[str, Any], near_cccl: bool) -> Dict[str, str]:
+    def _build_fields(self, flood: Dict[str, Any], near_cccl: bool, county: str = "Pinellas") -> Dict[str, str]:
         fld_zone = str(flood.get("FLD_ZONE") or "").strip().upper()
         zone_subty = str(flood.get("ZONE_SUBTY") or "").strip()
         sfha = str(flood.get("SFHA_TF") or "").strip().upper() == "T"
@@ -200,7 +200,7 @@ class EnvironmentalAgent:
         # ── geotechnical ──────────────────────────────────────────────
         geo_lines = [
             "Geotechnical investigation required prior to design.",
-            "Pinellas County is within Florida karst terrain — sinkhole risk assessment (ASTM D6429) recommended.",
+            f"{county} County is within Florida karst terrain — sinkhole risk assessment (ASTM D6429) recommended.",
         ]
         if is_sfha:
             geo_lines.append(
@@ -261,6 +261,6 @@ class EnvironmentalAgent:
         flood = self._get_flood_zone(lat, lon)
         near_cccl = self._near_cccl(lat, lon)
 
-        result = self._build_fields(flood, near_cccl)
+        result = self._build_fields(flood, near_cccl, county)
         result["_flood_zone"] = flood.get("FLD_ZONE", "")  # for display in notify
         return result

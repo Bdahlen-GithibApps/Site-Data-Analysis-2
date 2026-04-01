@@ -200,6 +200,114 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Error querying PCPAO API: {str(exc)}"}
 
 
+def _fmt_adj(use_map: Dict[str, str]) -> str:
+    if not use_map:
+        return ""
+    parts = list(use_map.values())
+    return "Adjacent land uses: " + "; ".join(parts[:6])  # cap at 6 for readability
+
+
+def _pasco_adjacent_uses(session: requests.Session, parcel_id: str, rings: list) -> str:
+    """Return formatted adjacent land use string using parcel envelope + Pasco ArcGIS."""
+    pts = rings[0] if rings else []
+    if not pts:
+        return ""
+    min_x = min(p[0] for p in pts)
+    max_x = max(p[0] for p in pts)
+    min_y = min(p[1] for p in pts)
+    max_y = max(p[1] for p in pts)
+    pad = 15  # ~50 ft in web mercator metres
+    envelope = json.dumps({
+        "xmin": min_x - pad, "ymin": min_y - pad,
+        "xmax": max_x + pad, "ymax": max_y + pad,
+        "spatialReference": {"wkid": 102100},
+    })
+    try:
+        r = session.get(
+            "https://maps.pascopa.com/arcgis/rest/services/Parcels/MapServer/3/query",
+            params={
+                "geometry": envelope,
+                "geometryType": "esriGeometryEnvelope",
+                "inSR": "102100",
+                "spatialRel": "esriSpatialRelIntersects",
+                "where": f"ParcelID <> '{parcel_id.replace(chr(39), chr(39)+chr(39))}'",
+                "outFields": "DIR_CLASS,PHYS_CITY",
+                "returnGeometry": "false",
+                "f": "json",
+            },
+            timeout=15,
+        )
+        feats = r.json().get("features", [])
+        seen: Dict[str, str] = {}
+        for f in feats:
+            a = f.get("attributes") or {}
+            code = str(a.get("DIR_CLASS") or "").strip().zfill(3)
+            desc = lookup_dor_use_code(code)
+            if desc and code not in seen:
+                seen[code] = desc
+        return _fmt_adj(seen)
+    except Exception:
+        return ""
+
+
+def get_pinellas_adjacent_uses(parcel_id: str) -> str:
+    """Query EGIS Pinellas Parcels for geometry of parcel then find adjacent USE_CODEs."""
+    session = get_resilient_session()
+    base = "https://egis.pinellas.gov/gis/rest/services/PublicWebGIS/Parcels/MapServer/1/query"
+    digits = re.sub(r"[^0-9]", "", parcel_id)
+    dsp = parcel_id.strip()
+    where = (
+        f"PARCELID_DSP1='{dsp}' OR PARCELID_DSP2='{dsp}'"
+        + (f" OR STRAP='{digits}' OR PARCELID='{digits}'" if digits else "")
+    )
+    try:
+        # Step 1: get geometry of subject parcel
+        r = session.get(base, params={
+            "where": where, "outFields": "PARCELID",
+            "returnGeometry": "true", "outSR": "4326", "f": "json",
+        }, timeout=15)
+        feats = r.json().get("features", [])
+        if not feats:
+            return ""
+        rings = (feats[0].get("geometry") or {}).get("rings", [])
+        pts = rings[0] if rings else []
+        if not pts:
+            return ""
+        # Step 2: build envelope and query adjacent parcels
+        min_x = min(p[0] for p in pts)
+        max_x = max(p[0] for p in pts)
+        min_y = min(p[1] for p in pts)
+        max_y = max(p[1] for p in pts)
+        pad = 0.0003  # ~30 m in decimal degrees
+        envelope = json.dumps({
+            "xmin": min_x - pad, "ymin": min_y - pad,
+            "xmax": max_x + pad, "ymax": max_y + pad,
+            "spatialReference": {"wkid": 4326},
+        })
+        excl = f"PARCELID<>'{digits}'" if digits else "1=1"
+        r2 = session.get(base, params={
+            "geometry": envelope,
+            "geometryType": "esriGeometryEnvelope",
+            "inSR": "4326",
+            "spatialRel": "esriSpatialRelIntersects",
+            "where": excl,
+            "outFields": "USE_CODE,LAND_USE_CODE",
+            "returnGeometry": "false",
+            "f": "json",
+        }, timeout=15)
+        feats2 = r2.json().get("features", [])
+        seen: Dict[str, str] = {}
+        for f in feats2:
+            a = f.get("attributes") or {}
+            code = str(a.get("USE_CODE") or a.get("LAND_USE_CODE") or "").strip()
+            desc = lookup_dor_use_code(code)
+            if desc and code not in seen:
+                seen[code] = desc
+        return _fmt_adj(seen)
+    except Exception:
+        return ""
+
+
 def _pasco_spatial_lookup(session: requests.Session, cx: float, cy: float) -> Dict[str, str]:
     """Given a parcel centroid (web mercator), return zoning and FLUM codes."""
     geom = json.dumps({"x": cx, "y": cy, "spatialReference": {"wkid": 102100}})
@@ -314,6 +422,8 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
             cy = sum(p[1] for p in pts) / len(pts)
             spatial = _pasco_spatial_lookup(session, cx, cy)
 
+        adj_uses = _pasco_adjacent_uses(session, pid, rings)
+
         return {
             "success": True,
             "parcel_id": pid,
@@ -324,6 +434,7 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
             "land_use": land_use,
             "site_area_sqft": "",
             "site_area_acres": acres_str,
+            "adjoining_uses": adj_uses,
             **spatial,
         }
     except Exception as exc:

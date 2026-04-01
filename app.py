@@ -24,7 +24,7 @@ from agents.parking_agent import ParkingAgent
 from agents.landscape_agent import LandscapeAgent
 from agents.infrastructure_agent import InfrastructureAgent
 from agents.environmental_agent import EnvironmentalAgent
-from tools.scraper import scrape_pinellas_property, scrape_pasco_property, expand_city_name, lookup_dor_use_code
+from tools.scraper import scrape_pinellas_property, scrape_pasco_property, expand_city_name, lookup_dor_use_code, get_pinellas_adjacent_uses
 from tools.helpers import (
     safe_float,
     safe_int,
@@ -526,6 +526,7 @@ def render_tab_lookup() -> None:
                         "land_use": "land_use",
                         "site_area_sqft": "site_area_sqft",
                         "site_area_acres": "site_area_acres",
+                        "adjoining_uses": "adjoining_uses",
                     }
                     for state_key, result_key in field_map.items():
                         val = result.get(result_key, "") or ""
@@ -533,6 +534,27 @@ def render_tab_lookup() -> None:
                         if state_key in ui_refs:
                             ui_refs[state_key].value = val
                             ui_refs[state_key].update()
+
+                    # Auto-fill Tax Parcel ID from lookup result
+                    pid_val = result.get("parcel_id", "") or ""
+                    if pid_val:
+                        state["tax_parcel"] = pid_val
+                        if "tax_parcel" in ui_refs:
+                            ui_refs["tax_parcel"].value = pid_val
+                            ui_refs["tax_parcel"].update()
+
+                    # For Pinellas, fetch adjacent uses (Pasco already in result)
+                    if county != "Pasco" and parcel_id and not state.get("adjoining_uses"):
+                        try:
+                            ui.notify("Fetching adjacent parcel data...", type="info")
+                            adj = get_pinellas_adjacent_uses(parcel_id)
+                            if adj:
+                                state["adjoining_uses"] = adj
+                                if "adjoining_uses" in ui_refs:
+                                    ui_refs["adjoining_uses"].value = adj
+                                    ui_refs["adjoining_uses"].update()
+                        except Exception:
+                            pass  # Adjacent lookup is best-effort
 
                     # Expand city name
                     state["city"] = expand_city_name(result.get("city", "") or "")

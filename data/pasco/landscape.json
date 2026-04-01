@@ -1,0 +1,104 @@
+{
+  "code_reference": "Pasco County Land Development Code (LDC), Chapter 500, Article VII — Landscaping and Tree Protection",
+  "_url": "https://library.municode.com/fl/pasco_county/codes/land_development_code",
+  "perimeter_buffers": {
+    "_description": "Pasco County LDC Article VII requires perimeter buffers based on adjacency between land uses. Buffer width and planting density increase with land use intensity contrast.",
+    "buffer_types": {
+      "type_A": {
+        "label": "Type A Buffer (Low Intensity)",
+        "min_width_ft": 5,
+        "trees_per_100ft": 1,
+        "shrub_hedge_required": true,
+        "berm_or_wall_required": false,
+        "notes": "Minimum 5-foot wide planting strip with 1 canopy tree per 100 linear feet and a continuous shrub hedge. Used between similar low-intensity uses."
+      },
+      "type_B": {
+        "label": "Type B Buffer (Moderate Intensity)",
+        "min_width_ft": 10,
+        "trees_per_100ft": 2,
+        "shrub_hedge_required": true,
+        "berm_or_wall_required": false,
+        "notes": "Minimum 10-foot wide planting strip with 2 canopy trees per 100 linear feet and a continuous shrub hedge. Used between moderately contrasting uses."
+      },
+      "type_C": {
+        "label": "Type C Buffer (High Intensity)",
+        "min_width_ft": 15,
+        "trees_per_100ft": 3,
+        "shrub_hedge_required": true,
+        "berm_or_wall_required": true,
+        "notes": "Minimum 15-foot wide planting strip with 3 canopy trees per 100 linear feet, continuous shrub hedge, plus opaque masonry wall or earthen berm (min 4 ft high). Used between high-contrast uses such as industrial/commercial adjacent to residential."
+      }
+    },
+    "adjacency_matrix": {
+      "_description": "Required buffer type based on subject zoning category vs adjacent land use category per Pasco LDC Article VII.",
+      "residential_adjacent_to_commercial_or_industrial": "type_C",
+      "residential_adjacent_to_residential": "type_A",
+      "commercial_adjacent_to_residential": "type_C",
+      "commercial_adjacent_to_commercial": "type_A",
+      "commercial_adjacent_to_industrial": "type_B",
+      "industrial_adjacent_to_residential": "type_C",
+      "industrial_adjacent_to_commercial": "type_B",
+      "industrial_adjacent_to_industrial": "type_A",
+      "default": "type_A"
+    }
+  },
+  "parking_lot_landscaping": {
+    "code_reference": "Pasco County LDC Article VII — Vehicular Use Area (VUA) Landscaping",
+    "interior_islands": {
+      "rule": "1 canopy tree per 10 parking spaces; minimum 5% of total VUA must be landscaped interior islands",
+      "min_island_area_sf": 150,
+      "min_island_width_ft": 8,
+      "trees_per_island": 1,
+      "notes": "Each interior island must contain at least one canopy tree (minimum 10 ft tall, 2.5-inch caliper at installation) plus groundcover, shrubs, or mulched beds. No bare soil permitted."
+    },
+    "perimeter_strip": {
+      "min_width_ft": 4,
+      "rule": "4-foot landscape strip required along all parking lot perimeters abutting a right-of-way or adjacent property line",
+      "shrub_hedge_required": true
+    },
+    "canopy_trees": {
+      "rule": "Minimum 1 canopy tree per 10 parking spaces; species must be from Pasco County approved native/Florida-Friendly tree species list",
+      "notes": "Trees may be located in interior islands or perimeter strips. No prohibited invasive species."
+    }
+  },
+  "tree_canopy": {
+    "min_canopy_coverage_pct": null,
+    "target_years": null,
+    "notes": "Pasco County does not specify a numeric overall site canopy coverage percentage but requires tree preservation and replacement per LDC Article VII. All trees ≥8 inches DBH on commercial/multi-family sites are regulated. Grand/heritage trees (≥18 inches DBH for most species) receive heightened protection and cannot be removed without mitigation."
+  },
+  "tree_canopy_heritage": {
+    "min_dbh_inches": 18,
+    "mitigation": "Removal of regulated trees requires on-site replacement (caliper-for-caliper per LDC ratio) or payment into the Pasco County Tree Bank at the current fee schedule per caliper inch removed. Tree removal permit required from Pasco County before clearing any regulated tree."
+  },
+  "irrigation": {
+    "required": true,
+    "type": "Automated irrigation system required for all required landscaping on commercial sites within Pasco County Utilities (PCU) reclaimed water service areas. Reclaimed water irrigation required where PCU reclaimed service is available.",
+    "notes": "Irrigation system must include rain sensor / smart controller. Separate reclaimed and potable water lines required with backflow prevention. Irrigation design must comply with Florida Friendly Landscaping and Pasco County water conservation policies."
+  },
+  "sight_triangles": {
+    "intersection_sight_triangle_ft": 20,
+    "driveway_sight_triangle_ft": 10,
+    "max_height_in_triangle_ft": 3.0,
+    "notes": "No plantings, signs, fences, or structures above 3 ft in height within sight triangles at intersections and driveway entrances per Pasco County LDC Article VII."
+  },
+  "plant_materials": {
+    "canopy_tree_min_height_ft": 10,
+    "canopy_tree_min_caliper_in": 2.5,
+    "florida_friendly_pct": 75,
+    "invasive_species_prohibited": true,
+    "notes": "All plantings must use species from the Pasco County approved plant species list. Minimum 75% of required plants must be Florida-Friendly (drought-tolerant, low-maintenance). Invasive species identified on the FDEP/IFAS Invasive Plant List are prohibited. Mulch required in all planting beds — min 3-inch depth organic mulch."
+  },
+  "street_trees": {
+    "required": true,
+    "spacing_ft": 40,
+    "notes": "1 canopy tree required per 40 linear feet of road frontage (approximate; verify per current Pasco LDC). Species from approved Pasco County street tree list. Canopy trees must be planted within or adjacent to the right-of-way as approved by Pasco County Engineering."
+  },
+  "foundation_landscaping": {
+    "required": true,
+    "notes": "Shrubs or groundcover at least 18 inches tall at installation required along all building facades facing a public right-of-way or primary parking area. Foundation landscaping must be maintained per the approved landscape plan."
+  },
+  "screening": {
+    "dumpster_enclosure": "Dumpster/solid waste enclosures and utility equipment must be screened on all sides with opaque fencing or masonry walls (min 6 ft high) plus foundation landscaping on exterior-facing sides.",
+    "mechanical_equipment": "Ground-mounted mechanical equipment visible from public ROW must be screened with opaque fencing or landscaping per Pasco LDC Article VII."
+  }
+}

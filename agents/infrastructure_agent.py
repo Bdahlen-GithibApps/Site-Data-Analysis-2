@@ -65,6 +65,29 @@ _DEFAULT_UTILITY = {
     "storm": "Pinellas County",
 }
 
+# Pasco County utility providers by city/area
+_PASCO_UTILITY_PROVIDERS: Dict[str, Dict[str, str]] = {
+    "new port richey":  {"water": "Pasco County Utilities (PCU) / City of New Port Richey (verify)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "port richey":      {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "holiday":          {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "trinity":          {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "land o lakes":     {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "lutz":             {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "zephyrhills":      {"water": "City of Zephyrhills", "sewer": "City of Zephyrhills", "reclaim": "N/A — verify with City", "storm": "City of Zephyrhills / Pasco County"},
+    "dade city":        {"water": "City of Dade City", "sewer": "City of Dade City", "reclaim": "N/A — verify with City", "storm": "City of Dade City / Pasco County"},
+    "wesley chapel":    {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "hudson":           {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "spring hill":      {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+    "odessa":           {"water": "Pasco County Utilities (PCU)", "sewer": "Pasco County Utilities (PCU)", "reclaim": "Pasco County Utilities (PCU)", "storm": "Pasco County"},
+}
+
+_PASCO_DEFAULT_UTILITY = {
+    "water": "Pasco County Utilities (PCU) — verify availability at (727) 847-2411",
+    "sewer": "Pasco County Utilities (PCU) — verify availability or OSTDS",
+    "reclaim": "Pasco County Utilities (PCU) — verify service area",
+    "storm": "Pasco County Stormwater",
+}
+
 # ──────────────────────────────────────────────────────────────────────
 # Road class and jurisdiction code decoders
 # ──────────────────────────────────────────────────────────────────────
@@ -180,6 +203,81 @@ class InfrastructureAgent:
                     break
         return util or dict(_DEFAULT_UTILITY)
 
+    def _get_pasco_utilities(self, city: str) -> Dict[str, str]:
+        key = (city or "").strip().lower()
+        util = _PASCO_UTILITY_PROVIDERS.get(key)
+        if not util:
+            for k, v in _PASCO_UTILITY_PROVIDERS.items():
+                if k in key or key in k:
+                    util = v
+                    break
+        return util or dict(_PASCO_DEFAULT_UTILITY)
+
+    def _lookup_pasco(self, address: str, city: str, zip_code: str,
+                      lat: float, lon: float) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
+
+        # Utilities
+        util = self._get_pasco_utilities(city)
+        result["utilities_water"] = util["water"]
+        result["utilities_sewer"] = util["sewer"]
+        result["utilities_reclaim"] = util["reclaim"]
+        result["utilities_storm"] = util["storm"]
+        result["utilities_gas"] = "Peoples Gas (TECO) — (877) 832-6747 | peoplesgas.com"
+        result["utilities_electric"] = "Duke Energy Florida — (800) 700-8744 | duke-energy.com"
+
+        # Roads — use Pasco County ArcGIS roads service
+        result["roadway_improvements"] = self._get_pasco_roads(lat, lon)
+
+        result["easements_required"] = (
+            "Verify recorded easements with title search and Pasco County Property Appraiser records.\n"
+            "Contact Pasco County Development Services regarding any required conservation, drainage, "
+            "or utility easements for the proposed development."
+        )
+        result["utility_extensions"] = (
+            "Verify utility availability and capacity with Pasco County Utilities (PCU) at (727) 847-2411.\n"
+            "Water/sewer availability letter from PCU required before site plan approval.\n"
+            "Extensions may require developer-funded main extension and capacity reservation fee."
+        )
+        result["additional_access"] = (
+            "Additional access may be available from alley or secondary street where present.\n"
+            "Confirm with site survey and Pasco County Development Services."
+        )
+        return result
+
+    def _get_pasco_roads(self, lat: float, lon: float) -> str:
+        """Query Pasco County roads ArcGIS service for adjacent roads."""
+        geom = json.dumps({"x": lon, "y": lat, "spatialReference": {"wkid": 4326}})
+        try:
+            r = _SESSION.get(
+                "https://maps.pascopa.com/arcgis/rest/services/Roads/MapServer/0/query",
+                params={
+                    "geometry": geom, "geometryType": "esriGeometryPoint",
+                    "inSR": "4326", "distance": 600, "units": "esriSRUnit_Foot",
+                    "outFields": "FULLNAME,ROADCLASS,MAINTBY",
+                    "returnGeometry": "false", "f": "json",
+                },
+                timeout=_TIMEOUT,
+            )
+            features = r.json().get("features", [])
+            if features:
+                seen: set = set()
+                roads = []
+                for f in features:
+                    a = f.get("attributes") or {}
+                    name = str(a.get("FULLNAME") or "").strip()
+                    if name and name not in seen:
+                        seen.add(name)
+                        roads.append(name)
+                if roads:
+                    return "Adjacent Roads (Pasco County):\n" + "\n".join(f"  • {r}" for r in roads)
+        except Exception as exc:
+            logger.warning("Pasco roads query failed: %s", exc)
+        return (
+            "Adjacent road data not available from Pasco GIS. "
+            "Verify road jurisdiction and ROW requirements with Pasco County Engineering."
+        )
+
     def _get_adjacent_roads(self, lat: float, lon: float) -> Dict[str, Any]:
         # Query all three road layers: major (0), arterial (1), local (2)
         all_features: List[Dict] = []
@@ -278,6 +376,11 @@ class InfrastructureAgent:
         if not lat or not lon:
             return {"error": "Could not geocode the address. Ensure a property has been looked up first."}
 
+        # Route by county
+        if (county or "").strip() == "Pasco":
+            return self._lookup_pasco(address, city, zip_code, lat, lon)
+
+        # ── Pinellas (default) ─────────────────────────────────────────
         # ── Utility Providers ──────────────────────────────────────────
         util = self._get_utilities(city)
         result["utilities_water"] = util["water"]

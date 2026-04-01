@@ -93,4 +93,4 @@ r4 = s.get(
 )
 d4 = r4.json()
 for f in d4.get("features", []):
-    print(f["attributes"])
+    print
