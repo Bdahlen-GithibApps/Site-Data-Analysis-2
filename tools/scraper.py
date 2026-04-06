@@ -368,6 +368,79 @@ def _pasco_spatial_lookup(session: requests.Session, cx: float, cy: float) -> Di
     }
 
 
+_PASCO_ZIP_CITY: Dict[str, str] = {
+    "33523": "Dade City",
+    "33524": "Dade City",
+    "33525": "Dade City",
+    "33526": "Dade City",
+    "33540": "Zephyrhills",
+    "33541": "Zephyrhills",
+    "33542": "Zephyrhills",
+    "33543": "Wesley Chapel",
+    "33544": "Wesley Chapel",
+    "33545": "Wesley Chapel",
+    "33556": "Odessa",
+    "33558": "Lutz",
+    "33559": "Lutz",
+    "33576": "San Antonio",
+    "33597": "Trilby",
+    "34610": "Spring Hill",
+    "34637": "Land O' Lakes",
+    "34638": "Land O' Lakes",
+    "34639": "Land O' Lakes",
+    "34652": "New Port Richey",
+    "34653": "New Port Richey",
+    "34654": "New Port Richey",
+    "34655": "New Port Richey",
+    "34667": "Hudson",
+    "34668": "Port Richey",
+    "34669": "Hudson",
+    "34690": "Holiday",
+    "34691": "Holiday",
+}
+
+
+def _pasco_reverse_geocode_city(session: requests.Session, cx: float, cy: float):
+    """Given a web-mercator centroid, return (city_name, zip5) from Census geocoder."""
+    import math
+    # Convert Web Mercator (EPSG:3857) to WGS84
+    lon = cx / 20037508.342 * 180.0
+    lat = math.degrees(2.0 * math.atan(math.exp(cy / 20037508.342 * math.pi)) - math.pi / 2.0)
+    try:
+        r = session.get(
+            "https://geocoding.geo.census.gov/geocoder/geographies/coordinates",
+            params={
+                "x": f"{lon:.6f}",
+                "y": f"{lat:.6f}",
+                "benchmark": "Public_AR_Census2020",
+                "vintage": "Census2020_Census2020",
+                "layers": "all",
+                "format": "json",
+            },
+            timeout=10,
+        )
+        geo = r.json().get("result", {}).get("geographies", {})
+        found_zip = ""
+        # Try ZIP code tabulation area first to capture zip
+        for zcta in geo.get("Zip Code Tabulation Areas", []):
+            z = str(zcta.get("BASENAME", "") or zcta.get("NAME", "")).strip().replace("ZCTA5 ", "")
+            if z.isdigit() and len(z) == 5:
+                found_zip = z
+                break
+        # Prefer incorporated place name
+        for place in geo.get("Incorporated Places", []):
+            name = str(place.get("NAME", "")).strip().title()
+            if name:
+                return name, found_zip
+        # Fall back to ZIP → city lookup
+        if found_zip:
+            city = _PASCO_ZIP_CITY.get(found_zip, "")
+            return city, found_zip
+    except Exception:
+        pass
+    return "", ""
+
+
 def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
     """Fetch parcel data from Pasco County ArcGIS REST service, including zoning and FLUM."""
     session = get_resilient_session()
@@ -398,10 +471,36 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
 
         street = str(a.get("PHYS_STREET") or "").strip()
         city = str(a.get("PHYS_CITY") or "").strip().title()
-        state = str(a.get("PHYS_STATE") or "FL").strip() or "FL"
+        state_code = str(a.get("PHYS_STATE") or "FL").strip() or "FL"
         zip_code = str(a.get("PHYS_ZIP") or "").strip()
-        address_parts = [street, city, f"{state} {zip_code}".strip()]
-        address = ", ".join(p for p in address_parts if p)
+
+        # Compute centroid from geometry (needed for spatial lookups + city fallback)
+        rings = (feat.get("geometry") or {}).get("rings", [[]])
+        pts = rings[0] if rings else []
+        cx = cy = None
+        if pts:
+            cx = sum(p[0] for p in pts) / len(pts)
+            cy = sum(p[1] for p in pts) / len(pts)
+
+        # Vacant land often has no PHYS_CITY — use Census reverse geocoder to fill it
+        if (not city or not zip_code) and cx is not None:
+            geo_city, geo_zip = _pasco_reverse_geocode_city(session, cx, cy)
+            if not city:
+                city = geo_city
+            if not zip_code and geo_zip:
+                zip_code = geo_zip
+
+        # If still no city, fall back to unincorporated label
+        if not city:
+            city = "Unincorporated Pasco"
+
+        # Build site address — if no physical street, match PA website which shows "No Physical Address"
+        if street:
+            addr_loc = f"{state_code} {zip_code}".strip()
+            address_parts = [p for p in [street, city, addr_loc] if p]
+            address = ", ".join(address_parts)
+        else:
+            address = "No Physical Address"
 
         acres_raw = a.get("TR_AC") if a.get("TR_AC") is not None else a.get("VAL_ACRES")
         try:
@@ -415,11 +514,7 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
 
         # Spatial zoning + FLUM lookup using parcel centroid
         spatial = {}
-        rings = (feat.get("geometry") or {}).get("rings", [[]])
-        pts = rings[0] if rings else []
-        if pts:
-            cx = sum(p[0] for p in pts) / len(pts)
-            cy = sum(p[1] for p in pts) / len(pts)
+        if cx is not None:
             spatial = _pasco_spatial_lookup(session, cx, cy)
 
         adj_uses = _pasco_adjacent_uses(session, pid, rings)

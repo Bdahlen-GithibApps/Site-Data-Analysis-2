@@ -1,5 +1,5 @@
 """
-Pinellas County Development Code Lookup — NiceGUI App
+Florida Development Code Lookup — NiceGUI App
 
 Multi-agent frontend with 4 tabs:
   1. Property Lookup — County + Parcel ID → PCPAO scrape → auto-fill
@@ -94,7 +94,9 @@ state: Dict[str, Any] = {
     # Code inputs (manual or from lookup)
     "zoning": "",
     "future_land_use": "",
-    # Parking inputs
+    # Parking inputs — list of {use_type, building_sf, num_units} dicts
+    "parking_uses": [],
+    # Legacy single-use keys kept for backward compat
     "use_type": "",
     "building_sf": "",
     "num_units": "",
@@ -297,63 +299,85 @@ def build_requirements_markdown() -> str:
 
 def build_parking_markdown() -> str:
     county = state.get("county", "Pinellas")
-    use_type = state.get("use_type", "")
-    building_sf = safe_float(state.get("building_sf"))
-    num_units = safe_int(state.get("num_units"))
+    uses = state.get("parking_uses", [])
 
-    if not use_type:
-        return "*Select a proposed use type to calculate parking requirements.*"
-
-    result = _parking_agent.calculate(county, use_type, building_sf, num_units)
-
-    if "error" in result:
-        return f"⚠️ {result['error']}"
+    if not uses:
+        return "*Add at least one proposed use type to calculate parking requirements.*"
 
     lines: List[str] = []
-    lines.append(f"### Parking Analysis — {use_type}")
-    lines.append(f"**Rate:** {result['rate_description']}")
-    if result.get("max_limit_description"):
-        lines.append(f"**Maximum:** {result['max_limit_description']}")
-    lines.append("")
+    total_required = 0
+    total_ada = 0
+    total_bicycle = 0
+    any_error = False
 
-    unit = result.get("unit", "")
-    calc_spaces = result.get("required_spaces", 0)
+    for row in uses:
+        use_type = row.get("use_type", "")
+        building_sf = safe_float(row.get("building_sf", ""))
+        num_units = safe_int(row.get("num_units", ""))
+        if not use_type:
+            continue
 
-    if calc_spaces == 0:
-        if unit == "1,000 sf GFA":
-            lines.append("*Enter building SF to calculate.*")
-        else:
-            lines.append(f"*Enter number of {unit}s to calculate.*")
-        return "\n".join(lines)
+        result = _parking_agent.calculate(county, use_type, building_sf, num_units)
 
-    if unit == "1,000 sf GFA" and building_sf > 0:
-        lines.append(f"Building area: **{fmt_num(building_sf)} sf GFA**")
-    elif num_units > 0:
-        lines.append(f"Units ({unit}): **{num_units}**")
+        if "error" in result:
+            lines.append(f"⚠️ **{use_type}:** {result['error']}")
+            any_error = True
+            continue
 
-    lines.append("")
-    lines.append("| Requirement | Spaces |")
-    lines.append("|-------------|--------|")
-    lines.append(f"| **Required Minimum** | **{calc_spaces}** |")
-    if result.get("max_spaces"):
-        lines.append(f"| Maximum Allowed | {result['max_spaces']} |")
-    lines.append(f"| ADA Accessible | {result['ada_spaces']} |")
-    lines.append(f"| Bicycle | {result['bicycle_spaces']} |")
-    lines.append("")
+        unit = result.get("unit", "")
+        calc_spaces = result.get("required_spaces", 0)
 
-    # Stall dimensions
-    lines.append("**Stall Dimensions (Table 138-3602.d):**")
-    lines.append("")
-    lines.append("| Layout | Stall | Aisle |")
-    lines.append("|--------|-------|-------|")
-    lines.append("| 90° | 9' × 18' | 24' (two-way) |")
-    lines.append("| 60° | 9' × 18' | 18' (one-way) |")
-    lines.append("| 45° | 9' × 18' | 15' (one-way) |")
-    lines.append("| Parallel | 8' × 22' | 12' (one-way) |")
-    lines.append("| ADA | 12' × 18' | — |")
-    lines.append("")
-    lines.append("---")
-    lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
+        lines.append(f"#### {use_type}")
+        lines.append(f"**Rate:** {result['rate_description']}")
+        if result.get("max_limit_description"):
+            lines.append(f"**Maximum:** {result['max_limit_description']}")
+
+        if calc_spaces == 0:
+            if unit == "1,000 sf GFA":
+                lines.append("*Enter building SF to calculate.*")
+            else:
+                lines.append(f"*Enter number of {unit}s to calculate.*")
+            lines.append("")
+            continue
+
+        if unit == "1,000 sf GFA" and building_sf > 0:
+            lines.append(f"Building area: **{fmt_num(building_sf)} sf GFA**")
+        elif num_units > 0:
+            lines.append(f"Units ({unit}): **{num_units}**")
+
+        lines.append(f"Required: **{calc_spaces}** spaces &nbsp;|&nbsp; ADA: {result['ada_spaces']} &nbsp;|&nbsp; Bicycle: {result['bicycle_spaces']}")
+        if result.get("max_spaces"):
+            lines.append(f"Maximum allowed: {result['max_spaces']}")
+        lines.append("")
+
+        total_required += calc_spaces
+        total_ada += result.get("ada_spaces", 0)
+        total_bicycle += result.get("bicycle_spaces", 0)
+
+    if len([r for r in uses if r.get("use_type")]) > 1 and total_required > 0:
+        lines.append("---")
+        lines.append("### Totals")
+        lines.append("")
+        lines.append("| Requirement | Spaces |")
+        lines.append("|-------------|--------|")
+        lines.append(f"| **Total Required Minimum** | **{total_required}** |")
+        lines.append(f"| ADA Accessible (total) | {total_ada} |")
+        lines.append(f"| Bicycle (total) | {total_bicycle} |")
+        lines.append("")
+
+    if total_required > 0:
+        lines.append("**Stall Dimensions (Table 138-3602.d):**")
+        lines.append("")
+        lines.append("| Layout | Stall | Aisle |")
+        lines.append("|--------|-------|-------|")
+        lines.append("| 90° | 9' × 18' | 24' (two-way) |")
+        lines.append("| 60° | 9' × 18' | 18' (one-way) |")
+        lines.append("| 45° | 9' × 18' | 15' (one-way) |")
+        lines.append("| Parallel | 8' × 22' | 12' (one-way) |")
+        lines.append("| ADA | 12' × 18' | — |")
+        lines.append("")
+        lines.append("---")
+        lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
 
     return "\n".join(lines)
 
@@ -491,7 +515,7 @@ def set_field(key: str, value: Any) -> None:
             ui_refs[key].update()
     if key in ("zoning", "future_land_use", "site_area_sqft"):
         refresh_requirements()
-    if key in ("use_type", "building_sf", "num_units"):
+    if key == "parking_uses":
         refresh_parking()
 
 
@@ -587,8 +611,12 @@ def render_tab_lookup() -> None:
                         except Exception:
                             pass  # Adjacent lookup is best-effort
 
-                    # Expand city name
-                    state["city"] = expand_city_name(result.get("city", "") or "")
+                    # Expand city name (Pinellas only — uses abbreviation lookup)
+                    raw_city = result.get("city", "") or ""
+                    if county == "Pasco":
+                        state["city"] = raw_city  # Pasco returns full city name already
+                    else:
+                        state["city"] = expand_city_name(raw_city)
                     if "city" in ui_refs:
                         ui_refs["city"].value = state["city"]
                         ui_refs["city"].update()
@@ -758,8 +786,10 @@ def render_tab_lookup() -> None:
                 ui.button("OPEN ZONING MAP", on_click=open_zoning_map, icon="map").classes("q-mb-md w-full")
 
                 def on_zoning_changed(e) -> None:
-                    set_field("zoning", e.value or "")
-                    if (e.value or "").strip():
+                    raw = (e.value or "").strip()
+                    code = raw.split(" — ")[0].strip()  # strip display suffix e.g. "MPUD — Name" → "MPUD"
+                    set_field("zoning", code)
+                    if code:
                         refresh_all()
 
                 zoning_input = labeled_input(
@@ -777,39 +807,87 @@ def render_tab_lookup() -> None:
                     placeholder="e.g. CMU, RES-1, NC, R-6 ...",
                     classes="code-field",
                 )
-                flu_input.on("change", lambda e: set_field("future_land_use", e.value or ""))
+                flu_input.on("change", lambda e: set_field("future_land_use", (e.value or "").split(" — ")[0].strip()))
                 ui_refs["flu_select"] = flu_input  # alias kept for run_analysis() compatibility
 
             with ui.card().classes("section-card q-mt-md w-full"):
                 ui.label("Parking Input").classes("section-title")
+                ui.label("Add one row per use type. For a PUD with multiple uses, add each separately.").classes("muted q-mb-sm")
 
                 use_options = _parking_agent.get_use_type_options(county)
-                use_select = labeled_select(
-                    "Proposed Use Type",
-                    use_options,
-                    value=state.get("use_type") or None,
-                    classes="code-field",
-                    with_input=True,
-                )
-                bldg_input = labeled_input(
-                    "Building Area (SF GFA)",
-                    value=state.get("building_sf", ""),
-                    placeholder="e.g. 15000",
-                    classes="code-field",
-                )
-                units_input = labeled_input(
-                    "Number of Units / Seats / Beds",
-                    value=state.get("num_units", ""),
-                    placeholder="e.g. 24",
-                    classes="code-field",
-                )
 
-                use_select.on("change", lambda e: set_field("use_type", e.value or ""))
-                bldg_input.on("change", lambda e: set_field("building_sf", e.value))
-                units_input.on("change", lambda e: set_field("num_units", e.value))
-                ui_refs["use_select"] = use_select
-                ui_refs["bldg_input"] = bldg_input
-                ui_refs["units_input"] = units_input
+                parking_rows_container = ui.column().classes("w-full gap-2")
+
+                def _render_parking_rows() -> None:
+                    parking_rows_container.clear()
+                    uses = state.get("parking_uses", [])
+                    with parking_rows_container:
+                        for idx, row in enumerate(uses):
+                            with ui.row().classes("w-full items-end no-wrap gap-2"):
+                                # Use type select
+                                with ui.column().classes("col-5"):
+                                    ui.label("Use Type").classes("text-caption text-grey-7")
+                                    sel = ui.select(
+                                        use_options,
+                                        value=row.get("use_type") or None,
+                                        with_input=True,
+                                    ).classes("w-full")
+                                    captured_idx = idx
+
+                                    def _on_use_change(e, i=captured_idx) -> None:
+                                        state["parking_uses"][i]["use_type"] = e.value or ""
+                                        refresh_parking()
+
+                                    sel.on("change", _on_use_change)
+
+                                # Building SF
+                                with ui.column().classes("col-3"):
+                                    ui.label("Building SF GFA").classes("text-caption text-grey-7")
+                                    sf_inp = ui.input(
+                                        placeholder="e.g. 15000",
+                                        value=row.get("building_sf", ""),
+                                    ).classes("w-full")
+
+                                    def _on_sf_change(e, i=captured_idx) -> None:
+                                        state["parking_uses"][i]["building_sf"] = e.value or ""
+                                        refresh_parking()
+
+                                    sf_inp.on("change", _on_sf_change)
+
+                                # Units/Seats/Beds
+                                with ui.column().classes("col-3"):
+                                    ui.label("Units / Seats / Beds").classes("text-caption text-grey-7")
+                                    units_inp = ui.input(
+                                        placeholder="e.g. 24",
+                                        value=row.get("num_units", ""),
+                                    ).classes("w-full")
+
+                                    def _on_units_change(e, i=captured_idx) -> None:
+                                        state["parking_uses"][i]["num_units"] = e.value or ""
+                                        refresh_parking()
+
+                                    units_inp.on("change", _on_units_change)
+
+                                # Remove button
+                                with ui.column().classes("col-1 items-center"):
+                                    ui.label("").classes("text-caption")  # spacer to align with inputs
+                                    def _remove_row(i=captured_idx) -> None:
+                                        state["parking_uses"].pop(i)
+                                        _render_parking_rows()
+                                        refresh_parking()
+
+                                    ui.button(icon="delete", on_click=_remove_row).props("flat round dense color=negative")
+
+                def _add_parking_row() -> None:
+                    state["parking_uses"].append({"use_type": "", "building_sf": "", "num_units": ""})
+                    _render_parking_rows()
+
+                # Initialize with one row if empty
+                if not state.get("parking_uses"):
+                    state["parking_uses"] = [{"use_type": "", "building_sf": "", "num_units": ""}]
+                _render_parking_rows()
+
+                ui.button("+ ADD USE", on_click=_add_parking_row, icon="add").props("outline").classes("q-mt-sm")
 
             with ui.card().classes("section-card q-mt-md w-full"):
                 def run_analysis() -> None:
@@ -824,13 +902,6 @@ def render_tab_lookup() -> None:
                         state["zoning"] = zoning
                     if flu:
                         state["future_land_use"] = flu
-                    # Sync parking inputs from UI in case change events weren't fired
-                    if "use_select" in ui_refs and ui_refs["use_select"].value:
-                        state["use_type"] = ui_refs["use_select"].value
-                    if "bldg_input" in ui_refs and ui_refs["bldg_input"].value:
-                        state["building_sf"] = ui_refs["bldg_input"].value
-                    if "units_input" in ui_refs and ui_refs["units_input"].value:
-                        state["num_units"] = ui_refs["units_input"].value
                     refresh_all()
                     tabs.set_value(tab2)
                     ui.notify("Analysis complete — see Requirements, Parking, and Landscape tabs.", type="positive")
@@ -919,14 +990,14 @@ def render_tab_infrastructure() -> None:
             count = len(populated)
             if count:
                 ui.notify(f"Infrastructure data populated — {count} fields filled.", type="positive")
-                infra_status.text = f"Auto-fill complete: {count} fields populated from Pinellas GIS."
+                infra_status.text = f"Auto-fill complete: {count} fields populated from {state.get('county', 'County')} GIS."
             else:
                 ui.notify("No data returned from GIS services. Try looking up the property first.", type="warning")
                 infra_status.text = "No data returned."
             infra_status.update()
 
         ui.button("LOOKUP INFRASTRUCTURE", on_click=do_infra_lookup).props("icon=search")
-        ui.label("Populates utilities, roads, and easements from Pinellas County GIS.").classes("muted")
+        ui.label("Populates utilities, roads, and easements from the county GIS based on the looked-up parcel.").classes("muted")
 
     with ui.row().classes("w-full items-start no-wrap gap-8"):
         with ui.column().classes("col-6"):
@@ -972,7 +1043,7 @@ def render_tab_environmental() -> None:
             if not address:
                 ui.notify("Look up a property first to populate the address.", type="warning")
                 return
-            env_status.text = "Querying FEMA and Pinellas GIS..."
+            env_status.text = f"Querying FEMA and {county} County GIS..."
             env_status.update()
             result = _env_agent.lookup(address, city, zip_code, county)
             flood_zone = result.pop("_flood_zone", "")
@@ -997,7 +1068,7 @@ def render_tab_environmental() -> None:
             ui.notify(f"Environmental data populated{zone_msg}.", type="positive")
 
         ui.button("LOOKUP ENVIRONMENTAL", on_click=do_env_lookup).props("icon=nature")
-        ui.label("Queries FEMA flood zones, CCCL proximity, and applies Pinellas/FL standards.").classes("muted")
+        ui.label("Queries FEMA flood zones, CCCL proximity, and applies county-specific FL standards.").classes("muted")
 
     with ui.row().classes("w-full items-start no-wrap gap-8"):
         with ui.column().classes("col-6"):
@@ -1062,17 +1133,11 @@ def render_tab_fees_schedule() -> None:
         "public_meetings":    "Required Public Meetings",
     }
 
-    # Header row: jurisdiction info + fetch button
-    with ui.row().classes("w-full items-center gap-4 q-mb-md"):
-        jurisdiction_label = ui.label("").classes("muted")
-        fetch_btn = ui.button("FETCH FEES", icon="search")
-
     # Scrollable results area
     results_area = ui.column().classes("w-full gap-2")
 
     def do_fetch_fees() -> None:
         current_county = state.get("county", "Pinellas")
-        current_city = state.get("city", "")
         fees = _load_fees_data(current_county)
         results_area.clear()
 
@@ -1083,10 +1148,6 @@ def render_tab_fees_schedule() -> None:
 
         source = fees.get("_source", "")
         note = fees.get("_note", "")
-        jurisdiction = fees.get("_jurisdiction", f"{current_county} County")
-
-        jurisdiction_label.text = f"{jurisdiction}" + (f" — {current_city}" if current_city else "")
-        jurisdiction_label.update()
 
         with results_area:
             if source:
@@ -1100,7 +1161,6 @@ def render_tab_fees_schedule() -> None:
                 if not content:
                     continue
                 with ui.expansion(label, icon="attach_money").classes("w-full fee-expansion"):
-                    # Render each line as a paragraph for readability
                     for line in content.strip().split("\n"):
                         line = line.strip()
                         if not line:
@@ -1110,13 +1170,199 @@ def render_tab_fees_schedule() -> None:
                         else:
                             ui.label(line).classes("fee-line")
 
-        ui.notify(f"Fee schedule loaded for {current_county} County.", type="positive")
-
-    fetch_btn.on("click", do_fetch_fees)
-
-    # Auto-load if county is already set
+    # Auto-load on tab open
     if state.get("county"):
         do_fetch_fees()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Excel export
+# ──────────────────────────────────────────────────────────────────────
+
+def generate_excel_report() -> None:
+    """Export all current state fields to a formatted .xlsx file."""
+    import pathlib
+    from datetime import datetime
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        ui.notify("openpyxl not installed — run: pip install openpyxl", type="negative")
+        return
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Site Data Report"
+
+    # ── Column widths ──
+    ws.column_dimensions["A"].width = 40
+    ws.column_dimensions["B"].width = 58
+
+    # ── Styles ──
+    _hdr_font    = Font(name="Calibri", bold=True, size=13, color="FFFFFF")
+    _hdr_fill    = PatternFill("solid", fgColor="0B1F3A")
+    _sec_font    = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+    _sec_fill    = PatternFill("solid", fgColor="1B3A6B")
+    _lbl_font    = Font(name="Calibri", bold=True, size=10, color="101820")
+    _val_font    = Font(name="Calibri", size=10, color="2C3E50")
+    _thin_side   = Side(style="thin", color="C9D3E1")
+    _btm_border  = Border(bottom=_thin_side)
+    _wrap_top    = Alignment(wrap_text=True, vertical="top")
+    _center      = Alignment(horizontal="center", vertical="center")
+
+    _row = [1]  # mutable counter
+
+    def _next() -> int:
+        r = _row[0]; _row[0] += 1; return r
+
+    def write_header(text: str) -> None:
+        r = _next()
+        ws.row_dimensions[r].height = 22
+        for col in (1, 2):
+            c = ws.cell(row=r, column=col)
+            c.fill = _hdr_fill
+        ca = ws.cell(row=r, column=1, value=text)
+        ca.font = _hdr_font
+        ca.alignment = _center
+
+    def write_section(text: str) -> None:
+        _next()  # blank spacer row
+        r = _next()
+        ws.row_dimensions[r].height = 16
+        for col in (1, 2):
+            c = ws.cell(row=r, column=col)
+            c.fill = _sec_fill
+        ca = ws.cell(row=r, column=1, value=text)
+        ca.font = _sec_font
+
+    def write_field(label: str, value: Any) -> None:
+        r = _next()
+        ca = ws.cell(row=r, column=1, value=label)
+        ca.font = _lbl_font
+        ca.border = _btm_border
+        cb = ws.cell(row=r, column=2, value=str(value) if value else "")
+        cb.font = _val_font
+        cb.border = _btm_border
+        cb.alignment = _wrap_top
+        if value and "\n" in str(value):
+            ws.row_dimensions[r].height = max(15, str(value).count("\n") * 15 + 15)
+
+    # ── Report header ──
+    write_header("DEVELOPMENT CODE LOOKUP REPORT")
+    write_field("Generated", datetime.now().strftime("%Y-%m-%d  %H:%M"))
+    write_field("County", state.get("county", ""))
+    write_field("Parcel ID", state.get("parcel_id", ""))
+
+    # ── Property Data ──
+    write_section("PROPERTY DATA")
+    write_field("Address", state.get("address", ""))
+    write_field("City / Municipality", state.get("city", ""))
+    write_field("Zip Code", state.get("zip", ""))
+    write_field("Owner", state.get("owner", ""))
+    write_field("Land Use (DOR)", state.get("land_use", ""))
+    write_field("Site Area (acres)", state.get("site_area_acres", ""))
+    write_field("Site Area (sf)", state.get("site_area_sqft", ""))
+
+    # ── Site Description ──
+    write_section("SITE DESCRIPTION")
+    write_field("Tax Parcel ID(s)", state.get("tax_parcel", ""))
+    write_field("Description of Site Views", state.get("site_views", ""))
+    write_field("Adjoining Property Uses and Zoning", state.get("adjoining_uses", ""))
+    write_field("Proposed Zoning / Designation", state.get("proposed_zoning", ""))
+
+    # ── Zoning & Land Use ──
+    write_section("ZONING & LAND USE")
+    write_field("Zoning District", state.get("zoning", ""))
+    write_field("Future Land Use (FLUM)", state.get("future_land_use", ""))
+
+    # ── Parking ──
+    write_section("PARKING")
+    parking_uses = state.get("parking_uses", [])
+    if parking_uses:
+        for i, row in enumerate(parking_uses, 1):
+            use_type = row.get("use_type", "")
+            if not use_type:
+                continue
+            prefix = f"Use {i}: {use_type}"
+            write_field(prefix + " — Building SF GFA", row.get("building_sf", ""))
+            write_field(prefix + " — Units / Seats / Beds", row.get("num_units", ""))
+    else:
+        write_field("Proposed Use Type", state.get("use_type", ""))
+        write_field("Building Area (SF GFA)", state.get("building_sf", ""))
+        write_field("Number of Units / Seats / Beds", state.get("num_units", ""))
+
+    # ── Infrastructure & Utilities ──
+    write_section("INFRASTRUCTURE & UTILITIES")
+    write_field("Water Provider", state.get("utilities_water", ""))
+    write_field("Reclaimed Water Provider", state.get("utilities_reclaim", ""))
+    write_field("Sanitary Sewer Provider", state.get("utilities_sewer", ""))
+    write_field("Stormwater / Drainage", state.get("utilities_storm", ""))
+    write_field("Gas Provider", state.get("utilities_gas", ""))
+    write_field("Electric Provider", state.get("utilities_electric", ""))
+    write_field("Easements Required", state.get("easements_required", ""))
+    write_field("Utility Extensions Required", state.get("utility_extensions", ""))
+    write_field("Roadway Improvements / ROW Dedication", state.get("roadway_improvements", ""))
+    write_field("Signalization Required", state.get("signalization", ""))
+    write_field("Potential Encroachments", state.get("encroachments", ""))
+    write_field("Additional Access Available", state.get("additional_access", ""))
+
+    # ── Subdivision ──
+    write_section("SUBDIVISION")
+    write_field("Platting / Subdivision Requirements", state.get("platting", ""))
+    write_field("Anticipated Takings / Easements", state.get("takings_easements", ""))
+
+    # ── Environmental ──
+    write_section("ENVIRONMENTAL")
+    write_field("Storm Water Treatment Requirements", state.get("stormwater_treatment", ""))
+    write_field("Wetlands or Flood Plains Present", state.get("wetlands_flood", ""))
+    write_field("Setback / Elevation for Flood Plain", state.get("flood_elevation", ""))
+    write_field("Natural or Cultural Resources", state.get("natural_cultural", ""))
+    write_field("Environmental Considerations", state.get("env_considerations", ""))
+    write_field("Geotechnical Considerations", state.get("geotechnical", ""))
+    write_field("Impact Studies Required", state.get("impact_studies", ""))
+    write_field("Traffic Study Required", state.get("traffic_study", ""))
+
+    # ── Building ──
+    write_section("BUILDING")
+    write_field("Current Building Code", state.get("building_code", ""))
+    write_field("Unique Construction Methods", state.get("construction_methods", ""))
+    write_field("Fire Route Considerations", state.get("fire_route", ""))
+
+    # ── Fees ──
+    write_section("FEES")
+    write_field("Fire Plan Review", state.get("fee_fire_plan_review", ""))
+    write_field("Building Plan Review", state.get("fee_bldg_plan_review", ""))
+    write_field("Site Plan Review", state.get("fee_site_plan_review", ""))
+    write_field("Building Permit", state.get("fee_bldg_permit", ""))
+    write_field("Demo Permit", state.get("fee_demo_permit", ""))
+    write_field("ROW Dedication / Easements", state.get("fee_dedication", ""))
+    write_field("Securities & Utility Connection", state.get("fee_securities", ""))
+    write_field("Lot Line Adjustment", state.get("fee_lot_line_adj", ""))
+    write_field("Pre-Application Meeting", state.get("fee_pre_app", ""))
+    write_field("Coastal Development Permit", state.get("fee_coastal_dev", ""))
+
+    # ── Schedule ──
+    write_section("SCHEDULE")
+    write_field("Lot Line Adjustment", state.get("sched_lot_line_adj", ""))
+    write_field("Entitlements Process", state.get("sched_entitlements", ""))
+    write_field("Permitting Steps", state.get("sched_perm_steps", ""))
+    write_field("Local Permitting (County / City)", state.get("sched_local", ""))
+    write_field("SWFWMD Permitting", state.get("sched_wmd", ""))
+    write_field("FDEP Permitting", state.get("sched_fdep", ""))
+    write_field("FDOT Permitting", state.get("sched_fdot", ""))
+    write_field("Required Staff Meetings", state.get("sched_staff_meetings", ""))
+    write_field("Required Public Meetings", state.get("sched_public_meetings", ""))
+
+    # ── Save ──
+    reports_dir = pathlib.Path(__file__).parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    pid = (state.get("parcel_id") or "unknown").replace("-", "").replace(" ", "_")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{pid}_{ts}.xlsx" if pid != "unknown" else f"report_{ts}.xlsx"
+    out_path = reports_dir / filename
+    wb.save(str(out_path))
+    ui.notify(f"Saved: reports\\{filename}", type="positive", timeout=8000)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1256,14 +1502,24 @@ ui.add_css(
     .fee-expansion .q-expansion-item__content { padding: 8px 16px 12px; }
     .fee-line { font-size: 0.85rem; color: #2c3e50; padding: 1px 0; line-height: 1.5; white-space: pre-wrap; }
     .link-btn { font-size: 0.8rem !important; text-transform: none !important; font-weight: 500; }
+    .export-btn { font-size: 0.85rem !important; font-weight: 600; }
     """
 )
 
 # ──────────────────────────────────────────────────────────────────────
 # Main layout
 # ──────────────────────────────────────────────────────────────────────
-ui.label("Pinellas County Development Code Lookup").classes("text-h4 q-mb-sm")
-ui.label("Unincorporated Pinellas County, FL — Chapter 138 Land Development Code").classes("muted q-mb-md")
+ui.label("Development Code Lookup").classes("text-h4 q-mb-sm")
+ui.label("Florida — Pinellas & Pasco Counties · Land Development Code & Comprehensive Plan").classes("muted q-mb-md")
+
+with ui.row().classes("w-full items-center justify-between q-mb-sm"):
+    ui.button(
+        "EXPORT TO EXCEL",
+        on_click=generate_excel_report,
+        icon="download",
+        color="positive",
+    ).props("outline").classes("export-btn")
+    ui.label("Exports all fields from every tab to a .xlsx file in the reports/ folder.").classes("muted")
 
 with ui.tabs().classes("tabs-left") as tabs:
     tab1 = ui.tab("Property Lookup")
