@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List
 
-from nicegui import ui
+from nicegui import ui, run
 
 from agents.zoning_agent import ZoningAgent
 from agents.parking_agent import ParkingAgent
@@ -301,7 +301,7 @@ def build_parking_markdown() -> str:
     county = state.get("county", "Pinellas")
     uses = state.get("parking_uses", [])
 
-    if not uses:
+    if not uses or not any(r.get("use_type") for r in uses):
         return "*Add at least one proposed use type to calculate parking requirements.*"
 
     lines: List[str] = []
@@ -538,6 +538,7 @@ def render_tab_lookup() -> None:
                         value=state.get("parcel_id", ""),
                         placeholder="e.g. 19-31-17-73166-001-0010",
                         classes="col-8",
+                        input_props="autocomplete=off",
                     )
                     county_input = labeled_select(
                         "County",
@@ -550,7 +551,7 @@ def render_tab_lookup() -> None:
                     parcel_input.on("change", lambda e: state.__setitem__("parcel_id", e.value))
                     county_input.on("change", lambda e: state.__setitem__("county", e.value))
 
-                def do_lookup() -> None:
+                async def do_lookup() -> None:
                     parcel_id = (parcel_input.value or state.get("parcel_id") or "").strip()
                     county = county_input.value or state.get("county", "Pinellas")
                     state["parcel_id"] = parcel_id
@@ -563,12 +564,14 @@ def render_tab_lookup() -> None:
                     if not is_valid:
                         ui.notify(error_msg, type="negative")
                         return
+                    lookup_btn.disable()
                     ui.notify("Fetching property data...", type="info")
                     if county == "Pasco":
-                        result = scrape_pasco_property(parcel_id)
+                        result = await run.io_bound(scrape_pasco_property, parcel_id)
                     else:
-                        result = scrape_pinellas_property(parcel_id)
+                        result = await run.io_bound(scrape_pinellas_property, parcel_id)
                     if not result.get("success"):
+                        lookup_btn.enable()
                         ui.notify(result.get("error", "Lookup failed"), type="negative")
                         return
 
@@ -602,7 +605,7 @@ def render_tab_lookup() -> None:
                     if county != "Pasco" and parcel_id and not state.get("adjoining_uses"):
                         try:
                             ui.notify("Fetching adjacent parcel data...", type="info")
-                            adj = get_pinellas_adjacent_uses(parcel_id)
+                            adj = await run.io_bound(get_pinellas_adjacent_uses, parcel_id)
                             if adj:
                                 state["adjoining_uses"] = adj
                                 if "adjoining_uses" in ui_refs:
@@ -669,7 +672,8 @@ def render_tab_lookup() -> None:
 
                     # Auto-run infrastructure lookup using the resolved address + city
                     ui.notify("Fetching infrastructure data...", type="info")
-                    infra_result = _infra_agent.lookup(
+                    infra_result = await run.io_bound(
+                        _infra_agent.lookup,
                         state.get("address", ""),
                         state.get("city", ""),
                         state.get("zip", ""),
@@ -688,7 +692,8 @@ def render_tab_lookup() -> None:
 
                     # Auto-run environmental lookup
                     ui.notify("Fetching environmental data...", type="info")
-                    env_result = _env_agent.lookup(
+                    env_result = await run.io_bound(
+                        _env_agent.lookup,
                         state.get("address", ""),
                         state.get("city", ""),
                         state.get("zip", ""),
@@ -724,8 +729,10 @@ def render_tab_lookup() -> None:
                                     on_click=lambda _, u=lnk["url"]: ui.navigate.to(u, new_tab=True),
                                     icon="open_in_new",
                                 ).props("outline dense").classes("link-btn")
+                    lookup_btn.enable()
 
-                ui.button("LOOKUP PROPERTY DATA", on_click=do_lookup, color="primary").classes("q-mt-md w-full")
+                lookup_btn = ui.button("LOOKUP PROPERTY DATA", color="primary").classes("q-mt-md w-full")
+                lookup_btn.on_click(do_lookup)
 
             # Lookup summary
             with ui.card().classes("section-card q-mt-md w-full"):
@@ -810,84 +817,7 @@ def render_tab_lookup() -> None:
                 flu_input.on("change", lambda e: set_field("future_land_use", (e.value or "").split(" — ")[0].strip()))
                 ui_refs["flu_select"] = flu_input  # alias kept for run_analysis() compatibility
 
-            with ui.card().classes("section-card q-mt-md w-full"):
-                ui.label("Parking Input").classes("section-title")
-                ui.label("Add one row per use type. For a PUD with multiple uses, add each separately.").classes("muted q-mb-sm")
 
-                use_options = _parking_agent.get_use_type_options(county)
-
-                parking_rows_container = ui.column().classes("w-full gap-2")
-
-                def _render_parking_rows() -> None:
-                    parking_rows_container.clear()
-                    uses = state.get("parking_uses", [])
-                    with parking_rows_container:
-                        for idx, row in enumerate(uses):
-                            with ui.row().classes("w-full items-end no-wrap gap-2"):
-                                # Use type select
-                                with ui.column().classes("col-5"):
-                                    ui.label("Use Type").classes("text-caption text-grey-7")
-                                    sel = ui.select(
-                                        use_options,
-                                        value=row.get("use_type") or None,
-                                        with_input=True,
-                                    ).classes("w-full")
-                                    captured_idx = idx
-
-                                    def _on_use_change(e, i=captured_idx) -> None:
-                                        state["parking_uses"][i]["use_type"] = e.value or ""
-                                        refresh_parking()
-
-                                    sel.on("change", _on_use_change)
-
-                                # Building SF
-                                with ui.column().classes("col-3"):
-                                    ui.label("Building SF GFA").classes("text-caption text-grey-7")
-                                    sf_inp = ui.input(
-                                        placeholder="e.g. 15000",
-                                        value=row.get("building_sf", ""),
-                                    ).classes("w-full")
-
-                                    def _on_sf_change(e, i=captured_idx) -> None:
-                                        state["parking_uses"][i]["building_sf"] = e.value or ""
-                                        refresh_parking()
-
-                                    sf_inp.on("change", _on_sf_change)
-
-                                # Units/Seats/Beds
-                                with ui.column().classes("col-3"):
-                                    ui.label("Units / Seats / Beds").classes("text-caption text-grey-7")
-                                    units_inp = ui.input(
-                                        placeholder="e.g. 24",
-                                        value=row.get("num_units", ""),
-                                    ).classes("w-full")
-
-                                    def _on_units_change(e, i=captured_idx) -> None:
-                                        state["parking_uses"][i]["num_units"] = e.value or ""
-                                        refresh_parking()
-
-                                    units_inp.on("change", _on_units_change)
-
-                                # Remove button
-                                with ui.column().classes("col-1 items-center"):
-                                    ui.label("").classes("text-caption")  # spacer to align with inputs
-                                    def _remove_row(i=captured_idx) -> None:
-                                        state["parking_uses"].pop(i)
-                                        _render_parking_rows()
-                                        refresh_parking()
-
-                                    ui.button(icon="delete", on_click=_remove_row).props("flat round dense color=negative")
-
-                def _add_parking_row() -> None:
-                    state["parking_uses"].append({"use_type": "", "building_sf": "", "num_units": ""})
-                    _render_parking_rows()
-
-                # Initialize with one row if empty
-                if not state.get("parking_uses"):
-                    state["parking_uses"] = [{"use_type": "", "building_sf": "", "num_units": ""}]
-                _render_parking_rows()
-
-                ui.button("+ ADD USE", on_click=_add_parking_row, icon="add").props("outline").classes("q-mt-sm")
 
             with ui.card().classes("section-card q-mt-md w-full"):
                 def run_analysis() -> None:
@@ -918,8 +848,88 @@ def render_tab_requirements() -> None:
 
 
 def render_tab_parking() -> None:
+    county = state.get("county", "Pinellas")
     ui.label("Parking Analysis").classes("text-h5 q-mb-md")
+
     with ui.card().classes("section-card w-full"):
+        ui.label("Parking Input").classes("section-title")
+        ui.label("Add one row per use type. For a PUD with multiple uses, add each separately.").classes("muted q-mb-sm")
+
+        use_options = _parking_agent.get_use_type_options(county)
+
+        parking_rows_container = ui.column().classes("w-full gap-2")
+
+        def _render_parking_rows() -> None:
+            parking_rows_container.clear()
+            uses = state.get("parking_uses", [])
+            with parking_rows_container:
+                for idx, row in enumerate(uses):
+                    with ui.row().classes("w-full items-end no-wrap gap-2"):
+                        with ui.column().classes("col-5"):
+                            ui.label("Use Type").classes("text-caption text-grey-7")
+                            sel = ui.select(
+                                use_options,
+                                value=row.get("use_type") or None,
+                                with_input=True,
+                            ).classes("w-full")
+                            captured_idx = idx
+
+                            def _on_use_change(e, i=captured_idx) -> None:
+                                state["parking_uses"][i]["use_type"] = e.value or ""
+                                refresh_parking()
+
+                            sel.on("change", _on_use_change)
+
+                        with ui.column().classes("col-3"):
+                            ui.label("Building SF GFA").classes("text-caption text-grey-7")
+                            sf_inp = ui.input(
+                                placeholder="e.g. 15000",
+                                value=row.get("building_sf", ""),
+                            ).classes("w-full")
+
+                            def _on_sf_change(e, i=captured_idx) -> None:
+                                state["parking_uses"][i]["building_sf"] = e.value or ""
+                                refresh_parking()
+
+                            sf_inp.on("change", _on_sf_change)
+                            sf_inp.on("keydown.enter", _on_sf_change)
+
+                        with ui.column().classes("col-3"):
+                            ui.label("Units / Seats / Beds").classes("text-caption text-grey-7")
+                            units_inp = ui.input(
+                                placeholder="e.g. 24",
+                                value=row.get("num_units", ""),
+                            ).classes("w-full")
+
+                            def _on_units_change(e, i=captured_idx) -> None:
+                                state["parking_uses"][i]["num_units"] = e.value or ""
+                                refresh_parking()
+
+                            units_inp.on("change", _on_units_change)
+                            units_inp.on("keydown.enter", _on_units_change)
+
+                        with ui.column().classes("col-1 items-center"):
+                            ui.label("").classes("text-caption")
+                            def _remove_row(i=captured_idx) -> None:
+                                state["parking_uses"].pop(i)
+                                _render_parking_rows()
+                                refresh_parking()
+
+                            ui.button(icon="delete", on_click=_remove_row).props("flat round dense color=negative")
+
+        def _add_parking_row() -> None:
+            state["parking_uses"].append({"use_type": "", "building_sf": "", "num_units": ""})
+            _render_parking_rows()
+
+        if not state.get("parking_uses"):
+            state["parking_uses"] = [{"use_type": "", "building_sf": "", "num_units": ""}]
+        _render_parking_rows()
+
+        with ui.row().classes("q-mt-sm gap-2"):
+            ui.button("+ ADD USE", on_click=_add_parking_row, icon="add").props("outline")
+            ui.button("CALCULATE PARKING", on_click=refresh_parking, color="primary").props("icon=calculate")
+
+    with ui.card().classes("section-card q-mt-md w-full"):
         md = ui.markdown(build_parking_markdown()).classes("q-mt-sm")
         ui_refs["parking_md"] = md
 
@@ -1558,4 +1568,5 @@ ui.run(
     port=8081,
     show=False,
     reload=False,
+    reconnect_timeout=30,
 )
