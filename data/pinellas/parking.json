@@ -1,0 +1,241 @@
+{
+  "requirements": {
+    "Single Family Detached": {
+      "min_rate": "2 per dwelling unit",
+      "min_per_unit": 2.0,
+      "unit": "dwelling unit",
+      "max_limit": null
+    },
+    "Single Family Attached": {
+      "min_rate": "2 per dwelling unit",
+      "min_per_unit": 2.0,
+      "unit": "dwelling unit",
+      "max_limit": null
+    },
+    "Duplex": {
+      "min_rate": "2 per dwelling unit",
+      "min_per_unit": 2.0,
+      "unit": "dwelling unit",
+      "max_limit": null
+    },
+    "Multi-Family (Studio/1BR)": {
+      "min_rate": "1.25 per dwelling unit",
+      "min_per_unit": 1.25,
+      "unit": "dwelling unit",
+      "max_limit": null
+    },
+    "Multi-Family (2+ BR)": {
+      "min_rate": "1.5 per dwelling unit",
+      "min_per_unit": 1.5,
+      "unit": "dwelling unit",
+      "max_limit": null
+    },
+    "ALF / Group Home": {
+      "min_rate": "0.5 per bed/resident",
+      "min_per_unit": 0.5,
+      "unit": "bed",
+      "max_limit": null
+    },
+    "Office (General)": {
+      "min_rate": "3 per 1,000 sf GFA",
+      "min_per_unit": 3.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "4 per 1,000 sf GFA"
+    },
+    "Office (Medical/Dental)": {
+      "min_rate": "4 per 1,000 sf GFA",
+      "min_per_unit": 4.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "5 per 1,000 sf GFA"
+    },
+    "Retail (General)": {
+      "min_rate": "3 per 1,000 sf GFA",
+      "min_per_unit": 3.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "5 per 1,000 sf GFA"
+    },
+    "Shopping Center": {
+      "min_rate": "4 per 1,000 sf GFA",
+      "min_per_unit": 4.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "5 per 1,000 sf GFA"
+    },
+    "Restaurant (Sit-down)": {
+      "min_rate": "8 per 1,000 sf GFA",
+      "min_per_unit": 8.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "12 per 1,000 sf GFA"
+    },
+    "Restaurant (Fast Food)": {
+      "min_rate": "10 per 1,000 sf GFA",
+      "min_per_unit": 10.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "15 per 1,000 sf GFA"
+    },
+    "Convenience Store": {
+      "min_rate": "4 per 1,000 sf GFA",
+      "min_per_unit": 4.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": null
+    },
+    "Hotel/Motel": {
+      "min_rate": "1 per guest room + 3 per 1,000 sf meeting/restaurant",
+      "min_per_unit": 1.0,
+      "unit": "guest room",
+      "max_limit": null
+    },
+    "Warehouse/Storage": {
+      "min_rate": "1 per 1,000 sf GFA",
+      "min_per_unit": 1.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "2 per 1,000 sf GFA"
+    },
+    "Light Manufacturing": {
+      "min_rate": "2 per 1,000 sf GFA",
+      "min_per_unit": 2.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": "3 per 1,000 sf GFA"
+    },
+    "Self-Storage": {
+      "min_rate": "1 per 5,000 sf GFA + 2 for office",
+      "min_per_unit": 0.2,
+      "unit": "1,000 sf GFA",
+      "max_limit": null
+    },
+    "Church/Place of Worship": {
+      "min_rate": "1 per 3 seats in main assembly",
+      "min_per_unit": 0.33,
+      "unit": "seat",
+      "max_limit": null
+    },
+    "School (Elementary/Middle)": {
+      "min_rate": "2 per classroom",
+      "min_per_unit": 2.0,
+      "unit": "classroom",
+      "max_limit": null
+    },
+    "School (High School)": {
+      "min_rate": "5 per classroom",
+      "min_per_unit": 5.0,
+      "unit": "classroom",
+      "max_limit": null
+    },
+    "Day Care": {
+      "min_rate": "1 per 8 children capacity + 1 per employee",
+      "min_per_unit": null,
+      "unit": "special",
+      "max_limit": null
+    },
+    "Hospital": {
+      "min_rate": "2 per bed",
+      "min_per_unit": 2.0,
+      "unit": "bed",
+      "max_limit": null
+    },
+    "Fitness/Health Club": {
+      "min_rate": "5 per 1,000 sf GFA",
+      "min_per_unit": 5.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": null
+    },
+    "Marina": {
+      "min_rate": "0.5 per wet slip + 0.25 per dry slip",
+      "min_per_unit": 0.5,
+      "unit": "wet slip",
+      "max_limit": null
+    }
+  },
+  "ada_table": [
+    {
+      "total_spaces_min": 1,
+      "total_spaces_max": 25,
+      "accessible_required": 1
+    },
+    {
+      "total_spaces_min": 26,
+      "total_spaces_max": 50,
+      "accessible_required": 2
+    },
+    {
+      "total_spaces_min": 51,
+      "total_spaces_max": 75,
+      "accessible_required": 3
+    },
+    {
+      "total_spaces_min": 76,
+      "total_spaces_max": 100,
+      "accessible_required": 4
+    },
+    {
+      "total_spaces_min": 101,
+      "total_spaces_max": 150,
+      "accessible_required": 5
+    },
+    {
+      "total_spaces_min": 151,
+      "total_spaces_max": 200,
+      "accessible_required": 6
+    },
+    {
+      "total_spaces_min": 201,
+      "total_spaces_max": 300,
+      "accessible_required": 7
+    },
+    {
+      "total_spaces_min": 301,
+      "total_spaces_max": 400,
+      "accessible_required": 8
+    },
+    {
+      "total_spaces_min": 401,
+      "total_spaces_max": 500,
+      "accessible_required": 9
+    },
+    {
+      "total_spaces_min": 501,
+      "total_spaces_max": 1000,
+      "accessible_required": 2,
+      "note": "2% of total"
+    }
+  ],
+  "dimensions": {
+    "90_degree": {
+      "angle": 90,
+      "stall_width": 9.0,
+      "stall_depth": 18.0,
+      "aisle_width_two_way": 24.0,
+      "aisle_width_one_way": 24.0
+    },
+    "60_degree": {
+      "angle": 60,
+      "stall_width": 9.0,
+      "stall_depth": 18.0,
+      "aisle_width_two_way": 24.0,
+      "aisle_width_one_way": 18.0
+    },
+    "45_degree": {
+      "angle": 45,
+      "stall_width": 9.0,
+      "stall_depth": 18.0,
+      "aisle_width_two_way": 24.0,
+      "aisle_width_one_way": 15.0
+    },
+    "parallel": {
+      "angle": 0,
+      "stall_width": 8.0,
+      "stall_depth": 22.0,
+      "aisle_width_two_way": 24.0,
+      "aisle_width_one_way": 12.0
+    },
+    "accessible": {
+      "stall_width": 12.0,
+      "stall_depth": 18.0,
+      "note": "Diagonal or perpendicular accessible stalls"
+    }
+  },
+  "bicycle": {
+    "general_rule": "1 bicycle space per 20 motor vehicle spaces required, minimum 2",
+    "min_spaces": 2,
+    "spaces_per_mv_spaces": 20
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "RR": {
+    "name": "Residential Rural",
+    "max_density_du_per_acre": 2.5,
+    "max_far": null,
+    "max_isratio": 0.4,
+    "compatible_zoning": [
+      "R-A",
+      "R-E"
+    ],
+    "notes": "Low density, agricultural character areas."
+  },
+  "RE": {
+    "name": "Residential Estate",
+    "max_density_du_per_acre": 2.5,
+    "max_far": null,
+    "max_isratio": 0.45,
+    "compatible_zoning": [
+      "R-E",
+      "R-R"
+    ],
+    "notes": "Estate-character residential areas."
+  },
+  "RS": {
+    "name": "Residential Suburban",
+    "max_density_du_per_acre": 5.0,
+    "max_far": null,
+    "max_isratio": 0.55,
+    "compatible_zoning": [
+      "R-R",
+      "R-1",
+      "R-2"
+    ],
+    "notes": "Suburban density residential areas."
+  },
+  "RL": {
+    "name": "Residential Low",
+    "max_density_du_per_acre": 5.0,
+    "max_far": null,
+    "max_isratio": 0.65,
+    "compatible_zoning": [
+      "R-2",
+      "R-3"
+    ],
+    "notes": "Low density residential neighborhoods."
+  },
+  "RLM": {
+    "name": "Residential Low Medium",
+    "max_density_du_per_acre": 10.0,
+    "max_far": null,
+    "max_isratio": 0.7,
+    "compatible_zoning": [
+      "R-3",
+      "R-4"
+    ],
+    "notes": "Transitional density between low and medium."
+  },
+  "RM": {
+    "name": "Residential Medium",
+    "max_density_du_per_acre": 15.0,
+    "max_far": null,
+    "max_isratio": 0.75,
+    "compatible_zoning": [
+      "R-4",
+      "R-5",
+      "RM"
+    ],
+    "notes": "Medium density residential."
+  },
+  "RH": {
+    "name": "Residential High",
+    "max_density_du_per_acre": 30.0,
+    "max_far": null,
+    "max_isratio": 0.8,
+    "compatible_zoning": [
+      "R-5",
+      "RM"
+    ],
+    "notes": "High density residential."
+  },
+  "RU": {
+    "name": "Residential Urban",
+    "max_density_du_per_acre": 30.0,
+    "max_far": null,
+    "max_isratio": 0.85,
+    "compatible_zoning": [
+      "R-5",
+      "RM"
+    ],
+    "notes": "Urban residential character."
+  },
+  "CG": {
+    "name": "Commercial General",
+    "max_density_du_per_acre": null,
+    "max_far": 0.55,
+    "max_isratio": 0.9,
+    "compatible_zoning": [
+      "C-1",
+      "C-2",
+      "CP",
+      "LO",
+      "GO"
+    ],
+    "notes": "General commercial uses."
+  },
+  "OG": {
+    "name": "Office General",
+    "max_density_du_per_acre": null,
+    "max_far": 0.5,
+    "max_isratio": 0.8,
+    "compatible_zoning": [
+      "LO",
+      "GO"
+    ],
+    "notes": "Office-oriented areas."
+  },
+  "IL": {
+    "name": "Industrial Limited",
+    "max_density_du_per_acre": null,
+    "max_far": 0.65,
+    "max_isratio": 0.85,
+    "compatible_zoning": [
+      "E-1",
+      "E-2"
+    ],
+    "notes": "Light industrial and employment uses."
+  },
+  "IG": {
+    "name": "Industrial General",
+    "max_density_du_per_acre": null,
+    "max_far": 0.75,
+    "max_isratio": 0.9,
+    "compatible_zoning": [
+      "E-2",
+      "I"
+    ],
+    "notes": "General industrial uses."
+  },
+  "T/U": {
+    "name": "Transportation/Utility",
+    "max_density_du_per_acre": null,
+    "max_far": null,
+    "max_isratio": 0.9,
+    "compatible_zoning": [],
+    "notes": "Transportation and utility corridors/facilities."
+  },
+  "P": {
+    "name": "Preservation",
+    "max_density_du_per_acre": null,
+    "max_far": null,
+    "max_isratio": 0.1,
+    "compatible_zoning": [
+      "PC",
+      "P-RM",
+      "AL"
+    ],
+    "notes": "Environmentally sensitive lands."
+  },
+  "R/OS": {
+    "name": "Recreation/Open Space",
+    "max_density_du_per_acre": null,
+    "max_far": null,
+    "max_isratio": 0.4,
+    "compatible_zoning": [
+      "RBR",
+      "FBR"
+    ],
+    "notes": "Active and passive recreation areas."
+  },
+  "I/C": {
+    "name": "Institutional/Community",
+    "max_density_du_per_acre": null,
+    "max_far": 0.65,
+    "max_isratio": 0.8,
+    "compatible_zoning": [
+      "LI",
+      "GI"
+    ],
+    "notes": "Institutional and community facility areas."
+  }
+}
