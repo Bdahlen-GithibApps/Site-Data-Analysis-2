@@ -2,12 +2,13 @@
   "name": "Site Data Analysis",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "postCreateCommand": "pip install -r requirements.txt",
-  "postStartCommand": "python app.py &",
+  "postStartCommand": "bash .devcontainer/start.sh",
   "forwardPorts": [8080],
   "portsAttributes": {
     "8080": {
       "label": "Dev Code Lookup",
-      "onAutoForward": "openBrowser"
+      "onAutoForward": "openBrowser",
+      "visibility": "private"
     }
   },
   "customizations": {
