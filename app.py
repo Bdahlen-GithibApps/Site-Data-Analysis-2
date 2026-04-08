@@ -1565,7 +1565,8 @@ with ui.tab_panels(tabs, value=tab1).classes("w-full"):
 
 ui.run(
     title="Dev Code Lookup",
-    port=8081,
+    host="0.0.0.0",
+    port=8080,
     show=False,
     reload=False,
     reconnect_timeout=30,
