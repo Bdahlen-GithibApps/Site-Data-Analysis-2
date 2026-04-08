@@ -8,4 +8,3 @@ venv/
 .DS_Store
 .idea/
 .vscode/
-app_original_backup.py

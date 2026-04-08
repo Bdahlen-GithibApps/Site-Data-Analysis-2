@@ -1,70 +1,63 @@
 """
-Property Agent — handles parcel lookup across multiple counties.
+agents/property_agent.py — Parcel data lookup agent with multi-county strategy pattern.
 
-Uses a strategy pattern: each county has its own scraper function.
-All scrapers return the same standardised dict format.
+Supported counties:
+  - Pinellas  → scrapes PCPAO (pcpao.gov)
+  - Hillsborough → placeholder (not yet implemented)
+  - Pasco       → placeholder (not yet implemented)
 """
+
 from __future__ import annotations
 
-import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from tools.scraper import scrape_pinellas_property
 
-logger = logging.getLogger(__name__)
-
-# Standardised return dict shape (all keys always present):
-#   success: bool
-#   parcel_id: str
-#   address: str
-#   city: str
-#   zip: str
-#   owner: str
-#   land_use: str
-#   site_area_sqft: str  (formatted, e.g. "12,345")
-#   site_area_acres: str (formatted, e.g. "0.28")
-#   legal_description: str
-#   strap: str
-#   tax_district: str
-#   error: str  (only present when success=False)
-
-
-def _not_implemented(parcel_id: str, county: str) -> Dict[str, Any]:
-    return {
-        "success": False,
-        "error": f"Property lookup is not yet implemented for {county} County.",
-    }
-
 
 class PropertyAgent:
-    """Routes parcel lookup requests to the appropriate county scraper."""
+    """Fetches parcel data from county property appraiser systems."""
 
-    _COUNTY_STRATEGIES: dict[str, Any] = {
-        "Pinellas": scrape_pinellas_property,
+    SUPPORTED_COUNTIES = {
+        "Pinellas": "pcpao",
+        "Hillsborough": "hcpafl",
+        "Pasco": "pascopa",
     }
 
     def lookup(self, parcel_id: str, county: str) -> Dict[str, Any]:
         """
-        Look up a parcel and return a standardised result dict.
+        Look up parcel data for a given parcel_id in the specified county.
 
-        Parameters
-        ----------
-        parcel_id:
-            Raw parcel identifier string (formatting normalised per county).
-        county:
-            Display name of the county, e.g. ``"Pinellas"``.
-
-        Returns
-        -------
-        dict
-            Standardised result; see module docstring for shape.
+        Returns a dict with at minimum:
+            success (bool), error (str on failure), parcel_id, address, city, zip,
+            owner, land_use, site_area_sqft, site_area_acres, legal_description, strap.
         """
-        strategy = self._COUNTY_STRATEGIES.get(county)
-        if strategy is None:
-            logger.info("No strategy for county '%s'", county)
-            return _not_implemented(parcel_id, county)
-        try:
-            return strategy(parcel_id)
-        except Exception as exc:
-            logger.exception("Property lookup failed for %s / %s", county, parcel_id)
-            return {"success": False, "error": str(exc)}
+        strategy = self.SUPPORTED_COUNTIES.get(county)
+
+        if strategy == "pcpao":
+            return scrape_pinellas_property(parcel_id)
+        elif strategy == "hcpafl":
+            return self._lookup_hillsborough(parcel_id)
+        elif strategy == "pascopa":
+            return self._lookup_pasco(parcel_id)
+        else:
+            return {
+                "success": False,
+                "error": f"County '{county}' is not yet supported. "
+                         f"Supported counties: {', '.join(self.SUPPORTED_COUNTIES)}",
+            }
+
+    def _lookup_hillsborough(self, parcel_id: str) -> Dict[str, Any]:
+        # TODO: Implement HCPA API scraping
+        # https://gis.hcpafl.org/ has ArcGIS REST services
+        return {
+            "success": False,
+            "error": "Hillsborough County lookup not yet implemented.",
+        }
+
+    def _lookup_pasco(self, parcel_id: str) -> Dict[str, Any]:
+        # TODO: Implement Pasco PA lookup
+        # https://www.pascopa.com/
+        return {
+            "success": False,
+            "error": "Pasco County lookup not yet implemented.",
+        }

@@ -1,0 +1,217 @@
+{
+  "AG": {
+    "name": "Agricultural",
+    "description": "Agricultural — 0.1 du/acre max",
+    "category": "Agricultural",
+    "max_density_du_per_acre": 0.1,
+    "compatible_zoning": ["AC", "AC1"]
+  },
+  "AG-R": {
+    "name": "Agricultural/Rural",
+    "description": "Agricultural/Rural — 0.2 du/acre max",
+    "category": "Agricultural",
+    "max_density_du_per_acre": 0.2,
+    "compatible_zoning": ["AC", "AR", "AR1", "AR5"]
+  },
+  "AG/R": {
+    "name": "Agricultural/Rural",
+    "description": "Agricultural/Rural — 0.2 du/acre max",
+    "category": "Agricultural",
+    "max_density_du_per_acre": 0.2,
+    "compatible_zoning": ["AC", "AR", "AR1", "AR5"]
+  },
+  "AT": {
+    "name": "Major Attractors",
+    "description": "Major Attractors — large-scale civic, recreational, or institutional uses",
+    "category": "Public/Institutional",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "C/L": {
+    "name": "Coastal Land",
+    "description": "Coastal Land — 0.025 du/acre max",
+    "category": "Conservation",
+    "max_density_du_per_acre": 0.025,
+    "compatible_zoning": []
+  },
+  "COM": {
+    "name": "Commercial",
+    "description": "Commercial — retail, office, and service uses",
+    "category": "Commercial",
+    "compatible_zoning": ["C1", "C2", "C3", "ER", "ER2", "PO1", "PO2"]
+  },
+  "CON": {
+    "name": "Conservation Lands",
+    "description": "Conservation Lands — environmental preservation",
+    "category": "Conservation",
+    "compatible_zoning": []
+  },
+  "DC": {
+    "name": "City of Dade City",
+    "description": "City of Dade City — governed by municipal regulations",
+    "category": "Municipal",
+    "compatible_zoning": []
+  },
+  "EC": {
+    "name": "Employment Center",
+    "description": "Employment Center — office, light industrial, mixed use",
+    "category": "Mixed Use / Employment",
+    "compatible_zoning": ["I1", "C3", "PO1", "PO2", "PUD", "MPUD"]
+  },
+  "GH": {
+    "name": "Gateway Hub",
+    "description": "Gateway Hub — high-intensity mixed use at major corridors",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD", "C2", "C3"]
+  },
+  "IH": {
+    "name": "Industrial — Heavy",
+    "description": "Industrial-Heavy — manufacturing, warehousing, distribution",
+    "category": "Industrial",
+    "compatible_zoning": ["I2"]
+  },
+  "IL": {
+    "name": "Industrial — Light",
+    "description": "Industrial-Light — light manufacturing, flex, business park",
+    "category": "Industrial",
+    "compatible_zoning": ["I1", "C3"]
+  },
+  "MU": {
+    "name": "Mixed Uses",
+    "description": "Mixed Uses — combination of residential, office, and commercial",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD", "C1", "C2", "R3", "R4", "MF1", "MF2"]
+  },
+  "NPC": {
+    "name": "New Port Corners",
+    "description": "New Port Corners — master planned community overlay",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "NPR": {
+    "name": "New Port Richey — Retail/Office/Residential",
+    "description": "Retail/Office/Residential — City of New Port Richey jurisdiction",
+    "category": "Municipal",
+    "compatible_zoning": []
+  },
+  "NT": {
+    "name": "Newtown",
+    "description": "Newtown — specific area plan overlay",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "OFF": {
+    "name": "Office",
+    "description": "Office — professional, medical, and business office uses",
+    "category": "Commercial",
+    "compatible_zoning": ["ER", "ER2", "PO1", "PO2", "C1"]
+  },
+  "P/SP": {
+    "name": "Major Public/Semi-Public",
+    "description": "Major Public/Semi-Public — government, schools, hospitals, utilities",
+    "category": "Public/Institutional",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "PD": {
+    "name": "Planned Development",
+    "description": "Planned Development — site-specific development plan required",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "R/OS": {
+    "name": "Major Recreation/Open Space",
+    "description": "Major Recreation/Open Space — parks, trails, passive recreation",
+    "category": "Recreation / Open Space",
+    "compatible_zoning": []
+  },
+  "RES-1": {
+    "name": "Residential — 1 du/acre",
+    "description": "Residential — max 1 dwelling unit per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 1.0,
+    "compatible_zoning": ["R1", "AR", "AR1"]
+  },
+  "RES-3": {
+    "name": "Residential — 3 du/acre",
+    "description": "Residential — max 3 dwelling units per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 3.0,
+    "compatible_zoning": ["R2", "R1MH"]
+  },
+  "RES-6": {
+    "name": "Residential — 6 du/acre",
+    "description": "Residential — max 6 dwelling units per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 6.0,
+    "compatible_zoning": ["R3", "R2MH", "RMH"]
+  },
+  "RES-9": {
+    "name": "Residential — 9 du/acre",
+    "description": "Residential — max 9 dwelling units per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 9.0,
+    "compatible_zoning": ["R4", "MF1"]
+  },
+  "RES-12": {
+    "name": "Residential — 12 du/acre",
+    "description": "Residential — max 12 dwelling units per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 12.0,
+    "compatible_zoning": ["MF1", "MF2"]
+  },
+  "RES12": {
+    "name": "Residential — 12 du/acre",
+    "description": "Residential — max 12 dwelling units per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 12.0,
+    "compatible_zoning": ["MF1", "MF2"]
+  },
+  "RES-24": {
+    "name": "Residential — 24 du/acre",
+    "description": "Residential — max 24 dwelling units per gross acre",
+    "category": "Residential",
+    "max_density_du_per_acre": 24.0,
+    "compatible_zoning": ["MF2", "MF3"]
+  },
+  "ROR": {
+    "name": "Retail/Office/Residential",
+    "description": "Retail/Office/Residential — mixed use corridor designation",
+    "category": "Mixed Use",
+    "compatible_zoning": ["C1", "C2", "ER", "PO1", "PO2", "R4", "MF1", "PUD"]
+  },
+  "SA": {
+    "name": "City of San Antonio",
+    "description": "City of San Antonio — governed by municipal regulations",
+    "category": "Municipal",
+    "compatible_zoning": []
+  },
+  "TC": {
+    "name": "Town Center",
+    "description": "Town Center — compact mixed use walkable core",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD", "C1", "C2"]
+  },
+  "VMU1": {
+    "name": "Village Mixed Use — Type 1",
+    "description": "Village Mixed Use Type 1 — lower-intensity neighborhood mixed use",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "VMU2A": {
+    "name": "Village Mixed Use — Type 2A",
+    "description": "Village Mixed Use Type 2A — medium-intensity mixed use",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "VMU2B": {
+    "name": "Village Mixed Use — Type 2B",
+    "description": "Village Mixed Use Type 2B — higher-intensity mixed use",
+    "category": "Mixed Use",
+    "compatible_zoning": ["PUD", "MPUD"]
+  },
+  "ZH": {
+    "name": "City of Zephyrhills",
+    "description": "City of Zephyrhills — governed by municipal regulations",
+    "category": "Municipal",
+    "compatible_zoning": []
+  }
+}

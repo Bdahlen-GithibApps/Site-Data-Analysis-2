@@ -1,49 +1,29 @@
 """
-Shared helper utilities for the Dev Code Lookup app.
+tools/helpers.py — Shared helper utilities for the Site Data Analysis app.
 
-Includes numeric helpers, UI component factories, parcel ID validation,
-and the zoning map URL builder.
+Extracted from app.py. Includes:
+- Numeric converters: safe_float, safe_int, fmt_num
+- Input validation: validate_parcel_id
+- NiceGUI UI helpers: labeled_input, labeled_select
+- Zoning map URL helpers: get_zoning_map_url, _build_map_url_with_address
 """
+
 from __future__ import annotations
 
-import re
 import json
-import logging
+import re
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
 
 from nicegui import ui
 
-logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Data directory
-# ---------------------------------------------------------------------------
-_DATA_DIR = Path(__file__).parent.parent / "data" / "pinellas"
-
-
-def _load_maps() -> dict:
-    with open(_DATA_DIR / "maps.json") as f:
-        return json.load(f)
-
-
-_MAPS: dict | None = None
-
-
-def _get_maps() -> dict:
-    global _MAPS
-    if _MAPS is None:
-        _MAPS = _load_maps()
-    return _MAPS
-
-
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 # Numeric helpers
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 
 def safe_float(val: Any, default: float = 0.0) -> float:
-    """Convert a value to float, returning *default* on failure."""
     if val is None or val == "":
         return default
     try:
@@ -53,7 +33,6 @@ def safe_float(val: Any, default: float = 0.0) -> float:
 
 
 def safe_int(val: Any, default: int = 0) -> int:
-    """Convert a value to int, returning *default* on failure."""
     if val is None or val == "":
         return default
     try:
@@ -63,7 +42,6 @@ def safe_int(val: Any, default: int = 0) -> int:
 
 
 def fmt_num(val: Any) -> str:
-    """Format a number with thousands separators; return '' for empty/None."""
     if val is None or val == "":
         return ""
     try:
@@ -75,12 +53,11 @@ def fmt_num(val: Any) -> str:
         return str(val)
 
 
-# ---------------------------------------------------------------------------
-# Parcel ID validation
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
+# Validation
+# ──────────────────────────────────────────────────────────────────────
 
 def validate_parcel_id(parcel_id: str) -> tuple[bool, str]:
-    """Return (is_valid, error_message) for a raw parcel ID string."""
     if not parcel_id:
         return False, "Parcel ID cannot be empty"
     if len(parcel_id) > 30:
@@ -90,9 +67,9 @@ def validate_parcel_id(parcel_id: str) -> tuple[bool, str]:
     return True, ""
 
 
-# ---------------------------------------------------------------------------
-# NiceGUI component helpers
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
+# NiceGUI UI helpers
+# ──────────────────────────────────────────────────────────────────────
 
 def labeled_input(
     label: str,
@@ -103,7 +80,6 @@ def labeled_input(
     input_classes: str = "w-full",
     input_props: str = "",
 ) -> ui.input:
-    """Render a label + input pair and return the input element."""
     with ui.column().classes(classes):
         ui.label(label).classes("field-label")
         input_el = ui.input(value=value, placeholder=placeholder)
@@ -116,7 +92,7 @@ def labeled_input(
 
 def labeled_select(
     label: str,
-    options: Any,
+    options,
     *,
     value: Any = None,
     classes: str = "w-full",
@@ -124,7 +100,6 @@ def labeled_select(
     select_props: str = "",
     with_input: bool = False,
 ) -> ui.select:
-    """Render a label + select pair and return the select element."""
     with ui.column().classes(classes):
         ui.label(label).classes("field-label")
         select_el = ui.select(options, value=value, with_input=with_input)
@@ -135,17 +110,29 @@ def labeled_select(
         return select_el
 
 
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 # Zoning map URL helpers
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
+
+def _load_maps_data() -> dict:
+    path = Path(__file__).parent.parent / "data" / "pinellas" / "maps.json"
+    with path.open() as f:
+        return json.load(f)
+
+
+def _load_city_lookup_data() -> dict:
+    path = Path(__file__).parent.parent / "data" / "pinellas" / "cities.json"
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
 
 def _build_map_url_with_address(
-    map_url: Optional[str],
-    address: str,
-    city: str,
-    zip_code: str,
+    map_url: Optional[str], address: str, city: str, zip_code: str
 ) -> Optional[str]:
-    """Append address as a ``?find=`` parameter for ArcGIS apps that support it."""
+    """Append address as a ?find= parameter for ArcGIS apps that support it."""
     if not map_url or not address:
         return map_url
     if not any(
@@ -175,13 +162,33 @@ def _build_map_url_with_address(
     return urlunparse(parsed._replace(query=new_query))
 
 
-def get_zoning_map_url(
-    city: str,
-    address: str = "",
-    zip_code: str = "",
-) -> Optional[str]:
-    """Return the best zoning map URL for *city*, optionally deep-linked to an address."""
-    zoning_map_urls: dict = _get_maps().get("zoning_map_urls", {})
+def get_zoning_map_url(city: str, address: str = "", zip_code: str = "") -> Optional[str]:
+    """Get zoning map URL for a city, optionally deep-linked to an address.
+
+    Checks cities.json (confirmed/verified URLs) first, then falls back to maps.json.
+    """
+    # ── Try cities.json first (verified URLs) ─────────────────────────────────
+    city_lookup = _load_city_lookup_data()
+    if city:
+        city_key = city.strip().lower()
+        meta = city_lookup.get(city_key)
+        if not meta:
+            for key, data in city_lookup.items():
+                if isinstance(data, dict) and (key in city_key or city_key in key):
+                    meta = data
+                    break
+        if meta:
+            base = None
+            for url_key in ("zoning_flu_app", "zoning_flu_lookup_app", "zoning_app", "gis_viewer_app"):
+                if meta.get(url_key):
+                    base = meta[url_key]
+                    break
+            if base:
+                return _build_map_url_with_address(base, address, city, zip_code)
+
+    # ── Fall back to maps.json ─────────────────────────────────────────────────
+    maps_data = _load_maps_data()
+    zoning_map_urls = maps_data.get("zoning_map_urls", {})
 
     if not city:
         base = zoning_map_urls.get("Unincorporated Pinellas")
@@ -198,11 +205,7 @@ def get_zoning_map_url(
                 base = url
                 break
 
-    # Unincorporated fallback
-    if not base and "unincorporated" in city.lower():
-        base = zoning_map_urls.get("Unincorporated Pinellas")
-
-    # County fallback for any Pinellas city we don't have a specific URL for
+    # County fallback
     if not base:
         base = zoning_map_urls.get("Unincorporated Pinellas")
 

@@ -1,10 +1,11 @@
 """
-Pinellas County Development Code Lookup — NiceGUI App
+Florida Development Code Lookup — NiceGUI App
 
-Modular frontend: UI only. All data, business logic, and scraping live in:
-  agents/   — PropertyAgent, ZoningAgent, ParkingAgent, LandscapeAgent, OrchestratorAgent
-  tools/    — helpers, scraper, arcgis_client
-  data/     — JSON data files per county
+Multi-agent frontend with 4 tabs:
+  1. Property Lookup — County + Parcel ID → PCPAO scrape → auto-fill
+  2. Requirements  — Zoning dimensional standards + FLUM density/intensity
+  3. Parking        — Use-based parking calculation + ADA + bicycle
+  4. Landscape      — Buffer, tree canopy, and irrigation requirements
 
 Run:
     pip install -r requirements.txt
@@ -14,36 +15,71 @@ Run:
 from __future__ import annotations
 
 import math
-import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
-from nicegui import ui
+from nicegui import ui, run
 
-from agents.orchestrator import OrchestratorAgent
+from agents.zoning_agent import ZoningAgent
+from agents.parking_agent import ParkingAgent
+from agents.landscape_agent import LandscapeAgent
+from agents.infrastructure_agent import InfrastructureAgent
+from agents.environmental_agent import EnvironmentalAgent
+from tools.scraper import scrape_pinellas_property, scrape_pasco_property, expand_city_name, lookup_dor_use_code, get_pinellas_adjacent_uses
 from tools.helpers import (
-    labeled_input,
-    labeled_select,
-    validate_parcel_id,
     safe_float,
     safe_int,
     fmt_num,
+    validate_parcel_id,
+    labeled_input,
+    labeled_select,
     get_zoning_map_url,
 )
-from tools.scraper import expand_city_name
 
-logger = logging.getLogger(__name__)
+# ──────────────────────────────────────────────────────────────────────
+# Agent instances
+# ──────────────────────────────────────────────────────────────────────
 
-# ---------------------------------------------------------------------------
-# Initialise agents (Pinellas by default; county can change at runtime)
-# ---------------------------------------------------------------------------
-_orchestrator = OrchestratorAgent(county="Pinellas")
-_zoning_agent = _orchestrator.zoning_agent
-_parking_agent = _orchestrator.parking_agent
+_zoning_agent = ZoningAgent()
+_parking_agent = ParkingAgent()
+_landscape_agent = LandscapeAgent()
+_infra_agent = InfrastructureAgent()
+_env_agent = EnvironmentalAgent()
 
 
-# ---------------------------------------------------------------------------
+def _build_parcel_links(county: str, parcel_id: str, address: str, city: str) -> List[Dict[str, str]]:
+    """Return a list of {label, url} dicts for quick-access links relevant to the parcel."""
+    fema_query = f"{address} {city}".replace(" ", "%20")
+    fema_url = f"https://msc.fema.gov/portal/search?AddressQuery={fema_query}#searchresultsanchor"
+    links = []
+    if county == "Pasco":
+        # Pasco County Property Appraiser
+        links.append({"label": "Property Appraiser", "url": f"https://pascopa.com/parcel/?parcelid={parcel_id}"})
+        # Pasco GIS / Parcel Map
+        links.append({"label": "Parcel Map (GIS)", "url": f"https://maps.pascopa.com/Html5Viewer/?viewer=pasco&find={parcel_id}"})
+        # Pasco Clerk of Court deed search
+        links.append({"label": "Deed / OR Records", "url": f"https://pascoclerk.com/official-records-search/?SearchType=parcel&Parcel={parcel_id}"})
+        # Pasco Development Services
+        links.append({"label": "Development Services", "url": "https://pascogov.com/developmentservices"})
+    else:
+        # Pinellas County Property Appraiser
+        pid_clean = parcel_id.replace("-", "")
+        links.append({"label": "Property Appraiser", "url": f"https://www.pcpao.gov/general.php?parcel={pid_clean}"})
+        # Pinellas County GIS
+        links.append({"label": "Parcel Map (GIS)", "url": f"https://egis.pinellascounty.org/Html5Viewer/?viewer=pcgis&find={parcel_id}"})
+        # Pinellas Clerk of Court deed search
+        links.append({"label": "Deed / OR Records", "url": f"https://officialrecords.mypinellasclerk.org/search/SearchTypeParcel?ParcelID={pid_clean}"})
+        # Pinellas Building / DRS
+        links.append({"label": "Building & DRS", "url": "https://pinellascounty.org/build/"})
+    # FEMA flood map — same for all counties
+    links.append({"label": "FEMA Flood Map", "url": fema_url})
+    # SWFWMD ePermitting
+    links.append({"label": "SWFWMD ePermitting", "url": "https://www.swfwmd.state.fl.us/permits/epermitting"})
+    return links
+
+# ──────────────────────────────────────────────────────────────────────
 # App state
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
+
 state: Dict[str, Any] = {
     "county": "Pinellas",
     "parcel_id": "",
@@ -58,20 +94,79 @@ state: Dict[str, Any] = {
     # Code inputs (manual or from lookup)
     "zoning": "",
     "future_land_use": "",
-    # Parking inputs
+    # Parking inputs — list of {use_type, building_sf, num_units} dicts
+    "parking_uses": [],
+    # Legacy single-use keys kept for backward compat
     "use_type": "",
     "building_sf": "",
     "num_units": "",
+    # Site Information (SIR)
+    "tax_parcel": "",
+    "site_views": "",
+    "adjoining_uses": "",
+    "proposed_zoning": "",
+    # Subdivision (SIR)
+    "platting": "",
+    "takings_easements": "",
+    # Infrastructure (SIR)
+    "utilities_water": "",
+    "utilities_reclaim": "",
+    "utilities_sewer": "",
+    "utilities_storm": "",
+    "utilities_gas": "",
+    "utilities_electric": "",
+    "easements_required": "",
+    "utility_extensions": "",
+    "roadway_improvements": "",
+    "signalization": "",
+    "encroachments": "",
+    "additional_access": "",
+    # Environmental (SIR)
+    "impact_studies": "",
+    "stormwater_treatment": "",
+    "wetlands_flood": "",
+    "flood_elevation": "",
+    "natural_cultural": "",
+    "env_considerations": "",
+    "geotechnical": "",
+    "traffic_study": "",
+    # Building (SIR)
+    "building_code": "Florida Building Code",
+    "construction_methods": "",
+    "fire_route": "",
+    # Fees (SIR)
+    "fee_fire_plan_review": "",
+    "fee_bldg_plan_review": "",
+    "fee_site_plan_review": "",
+    "fee_bldg_permit": "",
+    "fee_demo_permit": "",
+    "fee_dedication": "",
+    "fee_securities": "",
+    "fee_lot_line_adj": "",
+    "fee_pre_app": "",
+    "fee_coastal_dev": "",
+    # Schedule (SIR)
+    "sched_lot_line_adj": "",
+    "sched_entitlements": "",
+    "sched_perm_steps": "",
+    "sched_local": "",
+    "sched_wmd": "",
+    "sched_fdep": "",
+    "sched_fdot": "",
+    "sched_staff_meetings": "",
+    "sched_public_meetings": "",
 }
 
 ui_refs: Dict[str, Any] = {}
 
 
-# ---------------------------------------------------------------------------
-# Requirements & parking markdown builders
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
+# Requirements calculation
+# ──────────────────────────────────────────────────────────────────────
 
 def build_requirements_markdown() -> str:
+    county = state.get("county", "Pinellas")
+    city = state.get("city", "")
     zoning_code = (state.get("zoning") or "").strip().upper()
     flu_code = (state.get("future_land_use") or "").strip().upper()
     site_sf = safe_float(state.get("site_area_sqft"))
@@ -82,7 +177,7 @@ def build_requirements_markdown() -> str:
     lines: List[str] = []
 
     # Dimensional standards
-    zd = _zoning_agent.get_zoning_standards(zoning_code)
+    zd = _zoning_agent.get_zoning_standards(county, zoning_code, city) if zoning_code else None
     if zd:
         lines.append(f"### Zoning: {zoning_code} — {zd['name']}")
         lines.append(f"**Category:** {zd['category']}")
@@ -96,6 +191,7 @@ def build_requirements_markdown() -> str:
         if zd.get("min_lot_depth"):
             lines.append(f"| Min Lot Depth | {zd['min_lot_depth']} |")
 
+        # Setbacks
         for key, label in [
             ("setback_front_structure", "Front (Structure)"),
             ("setback_front_porch", "Front (Porch/Deck)"),
@@ -121,6 +217,7 @@ def build_requirements_markdown() -> str:
             lines.append(f"*{zd['notes']}*")
         lines.append("")
 
+        # Lot size check
         min_sf = zd.get("min_lot_area_sf")
         if min_sf and site_sf > 0:
             if site_sf < min_sf:
@@ -133,7 +230,7 @@ def build_requirements_markdown() -> str:
         lines.append("")
 
     # FLUM
-    flu = _zoning_agent.get_flum_standards(flu_code)
+    flu = _zoning_agent.get_flum_standards(county, flu_code, city) if flu_code else None
     if flu:
         lines.append(f"### Future Land Use: {flu_code} — {flu['name']}")
         lines.append("")
@@ -148,6 +245,7 @@ def build_requirements_markdown() -> str:
         lines.append(f"| Compatible Zoning | {', '.join(flu.get('compatible_zoning', []))} |")
         lines.append("")
 
+        # Density/intensity calcs
         if site_sf > 0:
             acres = site_sf / 43560
             lines.append("**Calculated Limits (based on site area):**")
@@ -163,96 +261,230 @@ def build_requirements_markdown() -> str:
                 lines.append(f"- Max Impervious: **{fmt_num(max_imperv)} sf** ({flu['max_isratio'] * 100:.0f}% × {fmt_num(site_sf)} sf)")
             lines.append("")
 
+        # Compatibility check
         if zoning_code and flu.get("compatible_zoning"):
-            if zoning_code in flu["compatible_zoning"]:
+            compat = _zoning_agent.check_compatibility(county, zoning_code, flu_code, city)
+            if compat.get("compatible"):
                 lines.append(f"✅ Zoning **{zoning_code}** is consistent with FLU **{flu_code}**")
             else:
-                lines.append(
-                    f"⚠️ Zoning **{zoning_code}** may not be consistent with FLU **{flu_code}**"
-                    f" — compatible: {', '.join(flu['compatible_zoning'])}"
-                )
+                lines.append(f"⚠️ Zoning **{zoning_code}** may not be consistent with FLU **{flu_code}** — compatible: {', '.join(flu.get('compatible_zoning', []))}")
             lines.append("")
     elif flu_code:
         lines.append(f"⚠️ FLU category **{flu_code}** not found in data tables.")
         lines.append("")
 
+    # Code references — dynamic based on jurisdiction
+    city_lower = city.strip().lower()
     lines.append("---")
     lines.append("**Code References:**")
-    lines.append(
-        "Ch. 138, Art. III — Zoning Districts · Sec. 138-3501 — Building Height"
-        " · Sec. 138-3505 — Setbacks · Comprehensive Plan — Future Land Use Element"
-    )
+    if "st. pete" in city_lower or "st pete" in city_lower or "saint pete" in city_lower:
+        lines.append(
+            "City of St. Petersburg Land Development Regulations (LDR), Chapter 16 — Zoning Districts · "
+            "City of St. Petersburg Comprehensive Plan — Future Land Use Element · stpete.org/ldr"
+        )
+    elif county == "Pasco":
+        lines.append(
+            "Pasco County Land Development Code (LDC) — Chapters 500–522 Zoning Districts · "
+            "Pasco County Comprehensive Plan — Future Land Use Element · library.municode.com/fl/pasco_county"
+        )
+    else:
+        jurisdiction = _zoning_agent.get_jurisdiction_name(county, city)
+        lines.append(
+            f"{jurisdiction} — Ch. 138, Art. III — Zoning Districts · Sec. 138-3501 — Building Height · "
+            "Sec. 138-3505 — Setbacks · Comprehensive Plan — Future Land Use Element"
+        )
+
     return "\n".join(lines)
 
 
 def build_parking_markdown() -> str:
-    use_type = state.get("use_type", "")
-    building_sf = safe_float(state.get("building_sf"))
-    num_units = safe_int(state.get("num_units"))
+    county = state.get("county", "Pinellas")
+    uses = state.get("parking_uses", [])
 
-    if not use_type:
-        return "*Select a proposed use type to calculate parking requirements.*"
-
-    rate = _parking_agent.get_parking_rate(use_type)
-    if not rate:
-        return f"⚠️ Use type **{use_type}** not found in parking tables."
+    if not uses or not any(r.get("use_type") for r in uses):
+        return "*Add at least one proposed use type to calculate parking requirements.*"
 
     lines: List[str] = []
-    lines.append(f"### Parking Analysis — {use_type}")
-    lines.append(f"**Rate:** {rate['min_rate']}")
-    if rate.get("max_limit"):
-        lines.append(f"**Maximum:** {rate['max_limit']}")
-    lines.append("")
+    total_required = 0
+    total_ada = 0
+    total_bicycle = 0
+    any_error = False
 
-    calc_spaces = _parking_agent.calculate_spaces(use_type, building_sf, num_units)
-    unit = rate.get("unit", "")
+    for row in uses:
+        use_type = row.get("use_type", "")
+        building_sf = safe_float(row.get("building_sf", ""))
+        num_units = safe_int(row.get("num_units", ""))
+        if not use_type:
+            continue
 
-    if calc_spaces is None:
-        lines.append(
-            f"*Enter {'building SF' if unit == '1,000 sf GFA' else 'number of ' + unit + 's'} to calculate.*"
-        )
-        return "\n".join(lines)
+        result = _parking_agent.calculate(county, use_type, building_sf, num_units)
 
-    if unit == "1,000 sf GFA":
-        lines.append(f"Building area: **{fmt_num(building_sf)} sf GFA**")
-    elif unit == "dwelling unit":
-        lines.append(f"Dwelling units: **{num_units}**")
-    else:
-        lines.append(f"Units ({unit}): **{num_units}**")
+        if "error" in result:
+            lines.append(f"⚠️ **{use_type}:** {result['error']}")
+            any_error = True
+            continue
 
-    max_spaces = _parking_agent.get_max_spaces(use_type, building_sf) if building_sf > 0 else None
-    ada = _parking_agent.get_ada_spaces(calc_spaces)
-    bike = _parking_agent.get_bicycle_spaces(calc_spaces)
+        unit = result.get("unit", "")
+        calc_spaces = result.get("required_spaces", 0)
 
-    lines.append("")
-    lines.append("| Requirement | Spaces |")
-    lines.append("|-------------|--------|")
-    lines.append(f"| **Required Minimum** | **{calc_spaces}** |")
-    if max_spaces:
-        lines.append(f"| Maximum Allowed | {max_spaces} |")
-    lines.append(f"| ADA Accessible | {ada} |")
-    lines.append(f"| Bicycle | {bike} |")
-    lines.append("")
+        lines.append(f"#### {use_type}")
+        lines.append(f"**Rate:** {result['rate_description']}")
+        if result.get("max_limit_description"):
+            lines.append(f"**Maximum:** {result['max_limit_description']}")
 
-    lines.append("**Stall Dimensions (Table 138-3602.d):**")
-    lines.append("")
-    lines.append("| Layout | Stall | Aisle |")
-    lines.append("|--------|-------|-------|")
-    lines.append("| 90° | 9' × 18' | 24' (two-way) |")
-    lines.append("| 60° | 9' × 18' | 18' (one-way) |")
-    lines.append("| 45° | 9' × 18' | 15' (one-way) |")
-    lines.append("| Parallel | 8' × 22' | 12' (one-way) |")
-    lines.append("| ADA | 12' × 18' | — |")
-    lines.append("")
-    lines.append("---")
-    lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
+        if calc_spaces == 0:
+            if unit == "1,000 sf GFA":
+                lines.append("*Enter building SF to calculate.*")
+            else:
+                lines.append(f"*Enter number of {unit}s to calculate.*")
+            lines.append("")
+            continue
+
+        if unit == "1,000 sf GFA" and building_sf > 0:
+            lines.append(f"Building area: **{fmt_num(building_sf)} sf GFA**")
+        elif num_units > 0:
+            lines.append(f"Units ({unit}): **{num_units}**")
+
+        lines.append(f"Required: **{calc_spaces}** spaces &nbsp;|&nbsp; ADA: {result['ada_spaces']} &nbsp;|&nbsp; Bicycle: {result['bicycle_spaces']}")
+        if result.get("max_spaces"):
+            lines.append(f"Maximum allowed: {result['max_spaces']}")
+        lines.append("")
+
+        total_required += calc_spaces
+        total_ada += result.get("ada_spaces", 0)
+        total_bicycle += result.get("bicycle_spaces", 0)
+
+    if len([r for r in uses if r.get("use_type")]) > 1 and total_required > 0:
+        lines.append("---")
+        lines.append("### Totals")
+        lines.append("")
+        lines.append("| Requirement | Spaces |")
+        lines.append("|-------------|--------|")
+        lines.append(f"| **Total Required Minimum** | **{total_required}** |")
+        lines.append(f"| ADA Accessible (total) | {total_ada} |")
+        lines.append(f"| Bicycle (total) | {total_bicycle} |")
+        lines.append("")
+
+    if total_required > 0:
+        lines.append("**Stall Dimensions (Table 138-3602.d):**")
+        lines.append("")
+        lines.append("| Layout | Stall | Aisle |")
+        lines.append("|--------|-------|-------|")
+        lines.append("| 90° | 9' × 18' | 24' (two-way) |")
+        lines.append("| 60° | 9' × 18' | 18' (one-way) |")
+        lines.append("| 45° | 9' × 18' | 15' (one-way) |")
+        lines.append("| Parallel | 8' × 22' | 12' (one-way) |")
+        lines.append("| ADA | 12' × 18' | — |")
+        lines.append("")
+        lines.append("---")
+        lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
 
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Refresh helpers
-# ---------------------------------------------------------------------------
+def build_landscape_markdown() -> str:
+    county = state.get("county", "Pinellas")
+    reqs = _landscape_agent.get_requirements(county)
+
+    if not reqs.get("available"):
+        return f"*{reqs.get('message', 'Landscape data not available for this county.')}*"
+
+    lines: List[str] = []
+    lines.append(f"### Landscape Requirements — {county} County")
+    if reqs.get("code_reference"):
+        lines.append(f"*{reqs['code_reference']}*")
+    lines.append("")
+
+    # Perimeter Buffers
+    lines.append("#### Perimeter Buffers")
+    buffer_types = reqs.get("buffer_types", {})
+    for key in ("type_A", "type_B", "type_C"):
+        bt = buffer_types.get(key)
+        if bt:
+            lines.append(f"**{bt.get('label', key)}** — Min {bt.get('min_width_ft', '?')} ft wide, "
+                         f"{bt.get('trees_per_100ft', '?')} tree(s) per 100 lf")
+            if bt.get("notes"):
+                lines.append(f"  - {bt['notes']}")
+    lines.append("")
+
+    # Adjacency matrix
+    adjacency = reqs.get("adjacency_matrix", {})
+    adj_display = {k: v for k, v in adjacency.items() if not k.startswith("_")}
+    if adj_display:
+        lines.append("**Required Buffer by Adjacency:**")
+        lines.append("")
+        lines.append("| Scenario | Buffer Type |")
+        lines.append("|----------|-------------|")
+        for scenario, buf_type in adj_display.items():
+            label = scenario.replace("_", " ").title()
+            buf_label = buf_type.replace("_", " ").upper() if buf_type else "—"
+            lines.append(f"| {label} | {buf_label} |")
+        lines.append("")
+
+    # Parking Lot Landscaping
+    parking_lot = reqs.get("parking_lot", {})
+    if parking_lot:
+        lines.append("#### Parking Lot Landscaping")
+        for section_key, section in parking_lot.items():
+            if section_key == "code_reference":
+                continue
+            if isinstance(section, dict):
+                rule = section.get("rule") or section.get("notes", "")
+                if rule:
+                    lines.append(f"- {rule}")
+        lines.append("")
+
+    # Tree Canopy
+    canopy = reqs.get("tree_canopy", {})
+    heritage = reqs.get("tree_canopy_heritage", {})
+    if canopy or heritage:
+        lines.append("#### Tree Canopy Requirements")
+        if canopy.get("min_canopy_coverage_pct"):
+            lines.append(f"- Min {canopy['min_canopy_coverage_pct']}% canopy coverage at {canopy.get('target_years', 15)} years")
+        if canopy.get("notes"):
+            lines.append(f"  - {canopy['notes']}")
+        if heritage:
+            lines.append(f"- **Heritage Trees** (≥{heritage.get('min_dbh_inches', 24)}\" DBH): {heritage.get('mitigation', '')}")
+        lines.append("")
+
+    # Irrigation
+    irrigation = reqs.get("irrigation", {})
+    if irrigation:
+        lines.append("#### Irrigation")
+        lines.append(f"- Required: {'Yes' if irrigation.get('required') else 'No'}")
+        lines.append(f"- Type: {irrigation.get('type', 'N/A')}")
+        if irrigation.get("notes"):
+            lines.append(f"- {irrigation['notes']}")
+        lines.append("")
+
+    # Sight Triangles
+    sight = reqs.get("sight_triangles", {})
+    if sight:
+        lines.append("#### Sight Triangles")
+        lines.append(f"- Intersection triangle: {sight.get('intersection_sight_triangle_ft', '?')} ft")
+        lines.append(f"- Driveway triangle: {sight.get('driveway_sight_triangle_ft', '?')} ft")
+        lines.append(f"- Max plant height in triangle: {sight.get('max_height_in_triangle_ft', '?')} ft")
+        lines.append("")
+
+    # Plant Materials
+    plant = reqs.get("plant_materials", {})
+    if plant:
+        lines.append("#### Plant Material Standards")
+        lines.append(f"- Canopy tree minimum: {plant.get('canopy_tree_min_height_ft', '?')} ft height / {plant.get('canopy_tree_min_caliper_in', '?')}\" caliper")
+        lines.append(f"- Florida-Friendly minimum: {plant.get('florida_friendly_pct', '?')}% of required plantings")
+        if plant.get("invasive_species_prohibited"):
+            lines.append("- Invasive species (FDEP/IFAS list) are prohibited")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("**Code References:** Ch. 138, Art. IV — Landscaping & Tree Protection · Sec. 138-3800 thru 138-3804")
+
+    return "\n".join(lines)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Refresh functions
+# ──────────────────────────────────────────────────────────────────────
 
 def refresh_requirements() -> None:
     if "requirements_md" in ui_refs:
@@ -264,9 +496,15 @@ def refresh_parking() -> None:
         ui_refs["parking_md"].set_content(build_parking_markdown())
 
 
+def refresh_landscape() -> None:
+    if "landscape_md" in ui_refs:
+        ui_refs["landscape_md"].set_content(build_landscape_markdown())
+
+
 def refresh_all() -> None:
     refresh_requirements()
     refresh_parking()
+    refresh_landscape()
 
 
 def set_field(key: str, value: Any) -> None:
@@ -277,15 +515,16 @@ def set_field(key: str, value: Any) -> None:
             ui_refs[key].update()
     if key in ("zoning", "future_land_use", "site_area_sqft"):
         refresh_requirements()
-    if key in ("use_type", "building_sf", "num_units"):
+    if key == "parking_uses":
         refresh_parking()
 
 
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 # Tab renderers
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 
 def render_tab_lookup() -> None:
+    county = state.get("county", "Pinellas")
     ui.label("Property Lookup & Site Data").classes("text-h5 q-mb-md")
 
     with ui.row().classes("w-full items-start no-wrap gap-8"):
@@ -299,6 +538,7 @@ def render_tab_lookup() -> None:
                         value=state.get("parcel_id", ""),
                         placeholder="e.g. 19-31-17-73166-001-0010",
                         classes="col-8",
+                        input_props="autocomplete=off",
                     )
                     county_input = labeled_select(
                         "County",
@@ -311,7 +551,7 @@ def render_tab_lookup() -> None:
                     parcel_input.on("change", lambda e: state.__setitem__("parcel_id", e.value))
                     county_input.on("change", lambda e: state.__setitem__("county", e.value))
 
-                def do_lookup() -> None:
+                async def do_lookup() -> None:
                     parcel_id = (parcel_input.value or state.get("parcel_id") or "").strip()
                     county = county_input.value or state.get("county", "Pinellas")
                     state["parcel_id"] = parcel_id
@@ -324,13 +564,18 @@ def render_tab_lookup() -> None:
                     if not is_valid:
                         ui.notify(error_msg, type="negative")
                         return
-
+                    lookup_btn.disable()
                     ui.notify("Fetching property data...", type="info")
-                    result = _orchestrator.property_agent.lookup(parcel_id, county)
+                    if county == "Pasco":
+                        result = await run.io_bound(scrape_pasco_property, parcel_id)
+                    else:
+                        result = await run.io_bound(scrape_pinellas_property, parcel_id)
                     if not result.get("success"):
+                        lookup_btn.enable()
                         ui.notify(result.get("error", "Lookup failed"), type="negative")
                         return
 
+                    # Populate state + UI
                     field_map = {
                         "address": "address",
                         "city": "city",
@@ -339,6 +584,7 @@ def render_tab_lookup() -> None:
                         "land_use": "land_use",
                         "site_area_sqft": "site_area_sqft",
                         "site_area_acres": "site_area_acres",
+                        "adjoining_uses": "adjoining_uses",
                     }
                     for state_key, result_key in field_map.items():
                         val = result.get(result_key, "") or ""
@@ -347,58 +593,148 @@ def render_tab_lookup() -> None:
                             ui_refs[state_key].value = val
                             ui_refs[state_key].update()
 
-                    state["city"] = expand_city_name(result.get("city", "") or "")
+                    # Auto-fill Tax Parcel ID from lookup result
+                    pid_val = result.get("parcel_id", "") or ""
+                    if pid_val:
+                        state["tax_parcel"] = pid_val
+                        if "tax_parcel" in ui_refs:
+                            ui_refs["tax_parcel"].value = pid_val
+                            ui_refs["tax_parcel"].update()
+
+                    # For Pinellas, fetch adjacent uses (Pasco already in result)
+                    if county != "Pasco" and parcel_id and not state.get("adjoining_uses"):
+                        try:
+                            ui.notify("Fetching adjacent parcel data...", type="info")
+                            adj = await run.io_bound(get_pinellas_adjacent_uses, parcel_id)
+                            if adj:
+                                state["adjoining_uses"] = adj
+                                if "adjoining_uses" in ui_refs:
+                                    ui_refs["adjoining_uses"].value = adj
+                                    ui_refs["adjoining_uses"].update()
+                        except Exception:
+                            pass  # Adjacent lookup is best-effort
+
+                    # Expand city name (Pinellas only — uses abbreviation lookup)
+                    raw_city = result.get("city", "") or ""
+                    if county == "Pasco":
+                        state["city"] = raw_city  # Pasco returns full city name already
+                    else:
+                        state["city"] = expand_city_name(raw_city)
                     if "city" in ui_refs:
                         ui_refs["city"].value = state["city"]
                         ui_refs["city"].update()
 
-                    refresh_zoning_button()
+                    # Enrich land use with official DOR description
+                    raw_land_use = result.get("land_use", "") or ""
+                    enriched = lookup_dor_use_code(raw_land_use)
+                    state["land_use"] = enriched
+                    if "land_use" in ui_refs:
+                        ui_refs["land_use"].value = enriched
+                        ui_refs["land_use"].update()
+
+                    # Auto-populate zoning + FLUM from spatial lookup (Pasco only)
+                    if county == "Pasco":
+                        zoning_val = result.get("zoning", "") or ""
+                        flu_val = result.get("future_land_use", "") or ""
+                        zoning_desc = result.get("zoning_description", "") or ""
+                        flum_desc = result.get("flum_description", "") or ""
+                        if zoning_val:
+                            set_field("zoning", zoning_val)
+                            if "zoning_select" in ui_refs:
+                                zoning_display = f"{zoning_val} — {zoning_desc}" if zoning_desc else zoning_val
+                                ui_refs["zoning_select"].value = zoning_display
+                                ui_refs["zoning_select"].update()
+                        if flu_val:
+                            set_field("future_land_use", flu_val)
+                            if "flu_select" in ui_refs:
+                                flu_display = f"{flu_val} — {flum_desc}" if flum_desc else flu_val
+                                ui_refs["flu_select"].value = flu_display
+                                ui_refs["flu_select"].update()
+                        label_parts = []
+                        if zoning_val:
+                            label_parts.append(f"Zoning: {zoning_val}" + (f" — {zoning_desc}" if zoning_desc else ""))
+                        if flu_val:
+                            label_parts.append(f"FLU: {flu_val}" + (f" — {flum_desc}" if flum_desc else ""))
+                        if "zoning_city_label" in ui_refs:
+                            ui_refs["zoning_city_label"].text = " · ".join(label_parts) if label_parts else "Zoning/FLU not found for this parcel."
+                            ui_refs["zoning_city_label"].update()
+                    else:
+                        if "zoning_city_label" in ui_refs:
+                            detected_city = state.get("city", "")
+                            ui_refs["zoning_city_label"].text = (
+                                f"City detected: {detected_city} — open the zoning map above, "
+                                "find the zoning code, then enter it below."
+                            )
+                            ui_refs["zoning_city_label"].update()
+
                     refresh_all()
                     ui.notify("Property data retrieved.", type="positive")
 
-                ui.button("LOOKUP PROPERTY DATA", on_click=do_lookup, color="primary").classes("q-mt-md w-full")
+                    # Auto-run infrastructure lookup using the resolved address + city
+                    ui.notify("Fetching infrastructure data...", type="info")
+                    infra_result = await run.io_bound(
+                        _infra_agent.lookup,
+                        state.get("address", ""),
+                        state.get("city", ""),
+                        state.get("zip", ""),
+                        state.get("county", "Pinellas"),
+                    )
+                    if not infra_result.get("error"):
+                        for key, value in infra_result.items():
+                            if key == "error" or not value:
+                                continue
+                            state[key] = value
+                            ref = ui_refs.get(key)
+                            if ref is not None and hasattr(ref, "value"):
+                                ref.value = value
+                                ref.update()
+                        ui.notify("Infrastructure data populated.", type="positive")
 
-                ui.label("Zoning & Land Use Map").classes("section-title q-mt-md")
+                    # Auto-run environmental lookup
+                    ui.notify("Fetching environmental data...", type="info")
+                    env_result = await run.io_bound(
+                        _env_agent.lookup,
+                        state.get("address", ""),
+                        state.get("city", ""),
+                        state.get("zip", ""),
+                        state.get("county", "Pinellas"),
+                    )
+                    flood_zone = env_result.pop("_flood_zone", "")
+                    if not env_result.get("error"):
+                        for key, value in env_result.items():
+                            if key == "error" or not value:
+                                continue
+                            state[key] = value
+                            ref = ui_refs.get(key)
+                            if ref is not None and hasattr(ref, "value"):
+                                ref.value = value
+                                ref.update()
+                        zone_msg = f" (FEMA Zone {flood_zone})" if flood_zone else ""
+                        ui.notify(f"Environmental data populated{zone_msg}.", type="positive")
 
-                def open_zoning_map() -> None:
-                    city = state.get("city", "")
-                    address = state.get("address", "")
-                    zip_code = state.get("zip", "")
-                    map_url = get_zoning_map_url(city, address, zip_code)
-                    if map_url:
-                        ui.navigate.to(map_url, new_tab=True)
-                    else:
-                        ui.notify("No zoning map URL found for this municipality.", type="warning")
+                    # Populate Quick Links
+                    links_row_ref = ui_refs.get("_links_row")
+                    if links_row_ref is not None:
+                        links_row_ref.clear()
+                        parcel_links = _build_parcel_links(
+                            county,
+                            parcel_id,
+                            state.get("address", ""),
+                            state.get("city", ""),
+                        )
+                        with links_row_ref:
+                            for lnk in parcel_links:
+                                ui.button(
+                                    lnk["label"],
+                                    on_click=lambda _, u=lnk["url"]: ui.navigate.to(u, new_tab=True),
+                                    icon="open_in_new",
+                                ).props("outline dense").classes("link-btn")
+                    lookup_btn.enable()
 
-                zoning_btn = ui.button("OPEN ZONING AND LAND USE MAP", on_click=open_zoning_map).classes("q-mt-sm w-full")
-                ui_refs["zoning_button"] = zoning_btn
-                zoning_status = ui.label("").classes("muted q-mt-xs")
-                zoning_status.visible = False
-                ui_refs["zoning_status"] = zoning_status
+                lookup_btn = ui.button("LOOKUP PROPERTY DATA", color="primary").classes("q-mt-md w-full")
+                lookup_btn.on_click(do_lookup)
 
-                def refresh_zoning_button() -> None:
-                    city = state.get("city", "")
-                    address = state.get("address", "")
-                    zip_code = state.get("zip", "")
-                    map_url = get_zoning_map_url(city, address, zip_code)
-
-                    label_city = city.upper() if city else ""
-                    if "unincorporated" in (city or "").lower():
-                        label_city = "PINELLAS COUNTY"
-                    label = f"OPEN {label_city} ZONING AND LAND USE MAP" if label_city else "OPEN ZONING AND LAND USE MAP"
-                    ui_refs["zoning_button"].text = label
-
-                    if map_url:
-                        ui_refs["zoning_button"].enable()
-                        ui_refs["zoning_status"].text = ""
-                        ui_refs["zoning_status"].visible = False
-                    else:
-                        ui_refs["zoning_button"].disable()
-                        ui_refs["zoning_status"].text = "No zoning map link found for this municipality."
-                        ui_refs["zoning_status"].visible = True
-
-                refresh_zoning_button()
-
+            # Lookup summary
             with ui.card().classes("section-card q-mt-md w-full"):
                 ui.label("Lookup Summary").classes("section-title")
                 ui_refs["address"] = labeled_input("Address", value=state.get("address", ""), classes="lookup-field")
@@ -412,68 +748,96 @@ def render_tab_lookup() -> None:
                 for key in ("address", "city", "zip", "owner", "land_use", "site_area_acres", "site_area_sqft"):
                     ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
 
-        # RIGHT COLUMN — Zoning + FLU inputs
+            # Site description (SIR manual fields)
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Site Description").classes("section-title")
+                ui_refs["tax_parcel"] = labeled_input("Tax Parcel ID(s)", value=state.get("tax_parcel", ""), placeholder="e.g. 24-31-16-53478-000-0210", classes="lookup-field")
+                ui_refs["site_views"] = labeled_input("Description of Site Views", value=state.get("site_views", ""), placeholder="e.g. Construction bordering left, storefront north", classes="lookup-field")
+                ui_refs["adjoining_uses"] = labeled_input("Adjoining Property Uses and Zoning", value=state.get("adjoining_uses", ""), placeholder="e.g. Zoning: DC-1, Uses: Retail", classes="lookup-field")
+                ui_refs["proposed_zoning"] = labeled_input("Proposed Zoning / Designation", value=state.get("proposed_zoning", ""), placeholder="e.g. CBD", classes="lookup-field")
+                for key in ("tax_parcel", "site_views", "adjoining_uses", "proposed_zoning"):
+                    ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
+
+            # Quick Links — populated after lookup
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Quick Links").classes("section-title")
+                links_row = ui.row().classes("w-full flex-wrap gap-2 q-mt-xs")
+                ui_refs["_links_row"] = links_row
+                with links_row:
+                    ui.label("Look up a parcel to generate links.").classes("muted")
         with ui.column().classes("col-6"):
             with ui.card().classes("section-card w-full"):
-                ui.label("Zoning & Land Use (from Map)").classes("section-title")
-                ui.label("Look up zoning and FLU on the map, then enter or select below.").classes("muted q-mb-sm")
+                ui.label("Zoning & Land Use").classes("section-title")
+                ui.label(
+                    "After looking up a parcel, open the zoning map for the detected city. "
+                    "Find the zoning code on the map and type it in below — "
+                    "the requirements tabs will populate automatically."
+                ).classes("muted q-mb-sm")
 
-                zoning_options = {
-                    code: f"{code} — {d['name']}"
-                    for code, d in _zoning_agent.zoning_districts.items()
-                }
-                flu_options = {
-                    code: f"{code} — {d['name']}"
-                    for code, d in _zoning_agent.flum_categories.items()
-                }
+                zoning_city_label = ui.label("Look up a parcel first to detect the city.").classes("text-caption text-italic q-mb-sm")
+                ui_refs["zoning_city_label"] = zoning_city_label
 
-                zoning_select = labeled_select(
+                def open_zoning_map() -> None:
+                    city = state.get("city", "").strip()
+                    address = state.get("address", "").strip()
+                    zip_code = state.get("zip", "").strip()
+                    if not city:
+                        ui.notify("Look up a property first to detect the city.", type="warning")
+                        return
+                    map_url = get_zoning_map_url(city, address, zip_code)
+                    if map_url:
+                        ui.navigate.to(map_url, new_tab=True)
+                    else:
+                        ui.notify(f"No zoning map URL available for {city}.", type="warning")
+
+                ui.button("OPEN ZONING MAP", on_click=open_zoning_map, icon="map").classes("q-mb-md w-full")
+
+                def on_zoning_changed(e) -> None:
+                    raw = (e.value or "").strip()
+                    code = raw.split(" — ")[0].strip()  # strip display suffix e.g. "MPUD — Name" → "MPUD"
+                    set_field("zoning", code)
+                    if code:
+                        refresh_all()
+
+                zoning_input = labeled_input(
                     "Zoning District",
-                    zoning_options,
-                    value=state.get("zoning") or None,
+                    value=state.get("zoning", ""),
+                    placeholder="e.g. NT-1, CC-2, CG, DC-1 ...",
                     classes="code-field",
-                    with_input=True,
                 )
-                flu_select = labeled_select(
-                    "Future Land Use (FLUM)",
-                    flu_options,
-                    value=state.get("future_land_use") or None,
-                    classes="code-field",
-                    with_input=True,
-                )
-                ui_refs["zoning_select"] = zoning_select
-                ui_refs["flu_select"] = flu_select
+                zoning_input.on("change", on_zoning_changed)
+                ui_refs["zoning_select"] = zoning_input  # alias kept for run_analysis() compatibility
 
-                zoning_select.on("change", lambda e: set_field("zoning", e.value or ""))
-                flu_select.on("change", lambda e: set_field("future_land_use", e.value or ""))
+                flu_input = labeled_input(
+                    "Future Land Use (FLUM)",
+                    value=state.get("future_land_use", ""),
+                    placeholder="e.g. CMU, RES-1, NC, R-6 ...",
+                    classes="code-field",
+                )
+                flu_input.on("change", lambda e: set_field("future_land_use", (e.value or "").split(" — ")[0].strip()))
+                ui_refs["flu_select"] = flu_input  # alias kept for run_analysis() compatibility
+
+
 
             with ui.card().classes("section-card q-mt-md w-full"):
-                ui.label("Parking Input").classes("section-title")
+                def run_analysis() -> None:
+                    # Read directly from UI elements in case state wasn't updated via change events
+                    zoning = state.get("zoning") or (ui_refs["zoning_select"].value if "zoning_select" in ui_refs else "")
+                    flu = state.get("future_land_use") or (ui_refs["flu_select"].value if "flu_select" in ui_refs else "")
+                    if not zoning and not flu:
+                        ui.notify("Set Zoning District and/or Future Land Use first.", type="warning")
+                        return
+                    # Sync to state
+                    if zoning:
+                        state["zoning"] = zoning
+                    if flu:
+                        state["future_land_use"] = flu
+                    refresh_all()
+                    tabs.set_value(tab2)
+                    ui.notify("Analysis complete — see Requirements, Parking, and Landscape tabs.", type="positive")
 
-                use_options = {k: k for k in _parking_agent.use_types}
-                use_select = labeled_select(
-                    "Proposed Use Type",
-                    use_options,
-                    value=state.get("use_type") or None,
-                    classes="code-field",
-                    with_input=True,
-                )
-                bldg_input = labeled_input(
-                    "Building Area (SF GFA)",
-                    value=state.get("building_sf", ""),
-                    placeholder="e.g. 15000",
-                    classes="code-field",
-                )
-                units_input = labeled_input(
-                    "Number of Units / Seats / Beds",
-                    value=state.get("num_units", ""),
-                    placeholder="e.g. 24",
-                    classes="code-field",
-                )
-
-                use_select.on("change", lambda e: set_field("use_type", e.value or ""))
-                bldg_input.on("change", lambda e: set_field("building_sf", e.value))
-                units_input.on("change", lambda e: set_field("num_units", e.value))
+                ui.button("RUN CODE ANALYSIS", on_click=run_analysis, color="primary").classes("w-full")
+                ui.label("Pulls all zoning, FLU, parking, and landscape requirements from code.").classes("muted q-mt-xs")
 
 
 def render_tab_requirements() -> None:
@@ -484,15 +848,536 @@ def render_tab_requirements() -> None:
 
 
 def render_tab_parking() -> None:
+    county = state.get("county", "Pinellas")
     ui.label("Parking Analysis").classes("text-h5 q-mb-md")
+
     with ui.card().classes("section-card w-full"):
+        ui.label("Parking Input").classes("section-title")
+        ui.label("Add one row per use type. For a PUD with multiple uses, add each separately.").classes("muted q-mb-sm")
+
+        use_options = _parking_agent.get_use_type_options(county)
+
+        parking_rows_container = ui.column().classes("w-full gap-2")
+
+        def _render_parking_rows() -> None:
+            parking_rows_container.clear()
+            uses = state.get("parking_uses", [])
+            with parking_rows_container:
+                for idx, row in enumerate(uses):
+                    with ui.row().classes("w-full items-end no-wrap gap-2"):
+                        with ui.column().classes("col-5"):
+                            ui.label("Use Type").classes("text-caption text-grey-7")
+                            sel = ui.select(
+                                use_options,
+                                value=row.get("use_type") or None,
+                                with_input=True,
+                            ).classes("w-full")
+                            captured_idx = idx
+
+                            def _on_use_change(e, i=captured_idx) -> None:
+                                state["parking_uses"][i]["use_type"] = e.value or ""
+                                refresh_parking()
+
+                            sel.on("change", _on_use_change)
+
+                        with ui.column().classes("col-3"):
+                            ui.label("Building SF GFA").classes("text-caption text-grey-7")
+                            sf_inp = ui.input(
+                                placeholder="e.g. 15000",
+                                value=row.get("building_sf", ""),
+                            ).classes("w-full")
+
+                            def _on_sf_change(e, i=captured_idx) -> None:
+                                state["parking_uses"][i]["building_sf"] = e.value or ""
+                                refresh_parking()
+
+                            sf_inp.on("change", _on_sf_change)
+                            sf_inp.on("keydown.enter", _on_sf_change)
+
+                        with ui.column().classes("col-3"):
+                            ui.label("Units / Seats / Beds").classes("text-caption text-grey-7")
+                            units_inp = ui.input(
+                                placeholder="e.g. 24",
+                                value=row.get("num_units", ""),
+                            ).classes("w-full")
+
+                            def _on_units_change(e, i=captured_idx) -> None:
+                                state["parking_uses"][i]["num_units"] = e.value or ""
+                                refresh_parking()
+
+                            units_inp.on("change", _on_units_change)
+                            units_inp.on("keydown.enter", _on_units_change)
+
+                        with ui.column().classes("col-1 items-center"):
+                            ui.label("").classes("text-caption")
+                            def _remove_row(i=captured_idx) -> None:
+                                state["parking_uses"].pop(i)
+                                _render_parking_rows()
+                                refresh_parking()
+
+                            ui.button(icon="delete", on_click=_remove_row).props("flat round dense color=negative")
+
+        def _add_parking_row() -> None:
+            state["parking_uses"].append({"use_type": "", "building_sf": "", "num_units": ""})
+            _render_parking_rows()
+
+        if not state.get("parking_uses"):
+            state["parking_uses"] = [{"use_type": "", "building_sf": "", "num_units": ""}]
+        _render_parking_rows()
+
+        with ui.row().classes("q-mt-sm gap-2"):
+            ui.button("+ ADD USE", on_click=_add_parking_row, icon="add").props("outline")
+            ui.button("CALCULATE PARKING", on_click=refresh_parking, color="primary").props("icon=calculate")
+
+    with ui.card().classes("section-card q-mt-md w-full"):
         md = ui.markdown(build_parking_markdown()).classes("q-mt-sm")
         ui_refs["parking_md"] = md
 
 
-# ---------------------------------------------------------------------------
-# CSS
-# ---------------------------------------------------------------------------
+def render_tab_landscape() -> None:
+    ui.label("Landscape Requirements").classes("text-h5 q-mb-md")
+    with ui.card().classes("section-card w-full"):
+        md = ui.markdown(build_landscape_markdown()).classes("q-mt-sm")
+        ui_refs["landscape_md"] = md
+
+
+def _sir_textarea(label: str, key: str) -> None:
+    """Helper: labeled textarea wired to state — uses same pattern as labeled_input."""
+    with ui.column().classes("w-full q-mt-sm"):
+        ui.label(label).classes("field-label")
+        inp = ui.textarea(value=state.get(key, "")).props("outlined rows=5").classes("w-full sir-textarea")
+        inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+        ui_refs[key] = inp
+
+
+def _sir_input(label: str, key: str, placeholder: str = "") -> None:
+    """Helper: labeled single-line input wired to state — uses same pattern as labeled_input."""
+    with ui.column().classes("w-full q-mt-sm"):
+        ui.label(label).classes("field-label")
+        inp = ui.input(value=state.get(key, ""), placeholder=placeholder).props("outlined dense").classes("w-full")
+        inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+        ui_refs[key] = inp
+
+
+def render_tab_infrastructure() -> None:
+    ui.label("Infrastructure & Utilities").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-center gap-4 q-mb-md"):
+        infra_status = ui.label("").classes("muted")
+
+        def do_infra_lookup() -> None:
+            address = state.get("address", "").strip()
+            city = state.get("city", "").strip()
+            zip_code = state.get("zip", "").strip()
+            county = state.get("county", "Pinellas")
+
+            if not address:
+                ui.notify("Look up a property first to populate the address.", type="warning")
+                return
+
+            infra_status.text = "Querying GIS services…"
+            infra_status.update()
+
+            result = _infra_agent.lookup(address, city, zip_code, county)
+
+            if result.get("error"):
+                ui.notify(result["error"], type="negative")
+                infra_status.text = result["error"]
+                infra_status.update()
+                return
+
+            populated = []
+            for key, value in result.items():
+                if key == "error" or not value:
+                    continue
+                state[key] = value
+                ref = ui_refs.get(key)
+                if ref is not None and hasattr(ref, "value"):
+                    ref.value = value
+                    ref.update()
+                populated.append(key)
+
+            count = len(populated)
+            if count:
+                ui.notify(f"Infrastructure data populated — {count} fields filled.", type="positive")
+                infra_status.text = f"Auto-fill complete: {count} fields populated from {state.get('county', 'County')} GIS."
+            else:
+                ui.notify("No data returned from GIS services. Try looking up the property first.", type="warning")
+                infra_status.text = "No data returned."
+            infra_status.update()
+
+        ui.button("LOOKUP INFRASTRUCTURE", on_click=do_infra_lookup).props("icon=search")
+        ui.label("Populates utilities, roads, and easements from the county GIS based on the looked-up parcel.").classes("muted")
+
+    with ui.row().classes("w-full items-start no-wrap gap-8"):
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Public / Private Utilities").classes("section-title")
+                _sir_input("Water Provider", "utilities_water", "e.g. City of St. Petersburg")
+                _sir_input("Reclaimed Water Provider", "utilities_reclaim", "e.g. City of St. Petersburg")
+                _sir_input("Sanitary Sewer Provider", "utilities_sewer", "e.g. City of St. Petersburg")
+                _sir_input("Stormwater / Drainage", "utilities_storm", "e.g. City of St. Petersburg")
+                _sir_input("Gas Provider", "utilities_gas", "e.g. TECO Peoples Gas")
+                _sir_input("Electric Provider", "utilities_electric", "e.g. Duke Energy Florida")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Easements & Extensions").classes("section-title")
+                _sir_textarea("Easements Required", "easements_required")
+                _sir_textarea("Utility Extensions Required", "utility_extensions")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Subdivision").classes("section-title")
+                _sir_textarea("Platting / Subdivision Requirements", "platting")
+                _sir_textarea("Anticipated Takings / Easements", "takings_easements")
+
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Roadway & Access").classes("section-title")
+                _sir_textarea("Anticipated Roadway Improvements / ROW Dedication", "roadway_improvements")
+                _sir_input("Signalization Required", "signalization", "e.g. N/A")
+                _sir_textarea("Potential Encroachments", "encroachments")
+                _sir_textarea("Additional Access Available", "additional_access")
+
+
+def render_tab_environmental() -> None:
+    ui.label("Environmental").classes("text-h5 q-mb-md")
+
+    with ui.row().classes("w-full items-center gap-4 q-mb-md"):
+        env_status = ui.label("").classes("muted")
+
+        def do_env_lookup() -> None:
+            address = state.get("address", "").strip()
+            city = state.get("city", "").strip()
+            zip_code = state.get("zip", "").strip()
+            county = state.get("county", "Pinellas")
+            if not address:
+                ui.notify("Look up a property first to populate the address.", type="warning")
+                return
+            env_status.text = f"Querying FEMA and {county} County GIS..."
+            env_status.update()
+            result = _env_agent.lookup(address, city, zip_code, county)
+            flood_zone = result.pop("_flood_zone", "")
+            if result.get("error"):
+                ui.notify(result["error"], type="negative")
+                env_status.text = result["error"]
+                env_status.update()
+                return
+            populated = []
+            for key, value in result.items():
+                if key == "error" or not value:
+                    continue
+                state[key] = value
+                ref = ui_refs.get(key)
+                if ref is not None and hasattr(ref, "value"):
+                    ref.value = value
+                    ref.update()
+                populated.append(key)
+            zone_msg = f" — FEMA Zone {flood_zone}" if flood_zone else ""
+            env_status.text = f"Auto-fill complete: {len(populated)} fields populated{zone_msg}."
+            env_status.update()
+            ui.notify(f"Environmental data populated{zone_msg}.", type="positive")
+
+        ui.button("LOOKUP ENVIRONMENTAL", on_click=do_env_lookup).props("icon=nature")
+        ui.label("Queries FEMA flood zones, CCCL proximity, and applies county-specific FL standards.").classes("muted")
+
+    with ui.row().classes("w-full items-start no-wrap gap-8"):
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Stormwater & Flooding").classes("section-title")
+                _sir_textarea("Storm Water Treatment Requirements", "stormwater_treatment")
+                _sir_textarea("Wetlands or Flood Plains Present", "wetlands_flood")
+                _sir_textarea("Setback / Elevation for Flood Plain", "flood_elevation")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Studies & Impact").classes("section-title")
+                _sir_input("Impact Studies Required", "impact_studies", "e.g. N/A or Traffic, NRA")
+                _sir_input("Traffic Study Required", "traffic_study", "e.g. Not included")
+
+        with ui.column().classes("col-6"):
+            with ui.card().classes("section-card w-full"):
+                ui.label("Resources & Conditions").classes("section-title")
+                _sir_textarea("Natural or Cultural Resources", "natural_cultural")
+                _sir_textarea("Environmental Considerations", "env_considerations")
+                _sir_textarea("Geotechnical Considerations", "geotechnical")
+
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Building").classes("section-title")
+                _sir_input("Current Building Code", "building_code", "e.g. Florida Building Code")
+                _sir_textarea("Unique Construction Methods (Sinkholes, Piles, CHHA, etc.)", "construction_methods")
+                _sir_input("Fire Route Considerations", "fire_route", "e.g. N/A")
+
+
+def _load_fees_data(county: str) -> dict:
+    """Load fees.json for the given county. Returns empty dict if not found."""
+    import json, pathlib
+    path = pathlib.Path(__file__).parent / "data" / county.lower() / "fees.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def render_tab_fees_schedule() -> None:
+    county = state.get("county", "Pinellas")
+    city = state.get("city", "")
+    ui.label("Fees & Schedule").classes("text-h5 q-mb-md")
+
+    # Label lookup for fee section keys
+    _FEE_LABELS = {
+        "application_fees":   "Application & Permit Fees",
+        "impact_fees":        "Impact Fees",
+        "pre_app":            "Pre-Application Meeting",
+        "perm_steps":         "Permitting Steps",
+        "local_permits":      "Local Permitting (County / City)",
+        "wmd":                "SWFWMD Permitting",
+        "fdep":               "FDEP Permitting",
+        "fdot":               "FDOT Permitting",
+        "dedication":         "ROW Dedication / Easements",
+        "securities":         "Securities & Utility Connection Fees",
+        "coastal_dev_permit": "Coastal Development Permit",
+        "entitlements":       "Entitlements Process",
+        "lot_line":           "Lot Line / Subdivision",
+        "staff_meetings":     "Required Staff Meetings",
+        "public_meetings":    "Required Public Meetings",
+    }
+
+    # Scrollable results area
+    results_area = ui.column().classes("w-full gap-2")
+
+    def do_fetch_fees() -> None:
+        current_county = state.get("county", "Pinellas")
+        fees = _load_fees_data(current_county)
+        results_area.clear()
+
+        if not fees:
+            with results_area:
+                ui.label(f"No fee data available for {current_county} County.").classes("muted")
+            return
+
+        source = fees.get("_source", "")
+        note = fees.get("_note", "")
+
+        with results_area:
+            if source:
+                ui.label(f"Source: {source}").classes("muted text-caption")
+            if note:
+                ui.label(f"Note: {note}").classes("muted text-caption q-mb-sm")
+
+            for key in fees.get("_sections", list(_FEE_LABELS.keys())):
+                label = _FEE_LABELS.get(key, key.replace("_", " ").title())
+                content = fees.get(key, "")
+                if not content:
+                    continue
+                with ui.expansion(label, icon="attach_money").classes("w-full fee-expansion"):
+                    for line in content.strip().split("\n"):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.endswith(":") or (line.startswith("  —") is False and ":" not in line and len(line) < 60):
+                            ui.label(line).classes("text-weight-bold q-mt-xs")
+                        else:
+                            ui.label(line).classes("fee-line")
+
+    # Auto-load on tab open
+    if state.get("county"):
+        do_fetch_fees()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Excel export
+# ──────────────────────────────────────────────────────────────────────
+
+def generate_excel_report() -> None:
+    """Export all current state fields to a formatted .xlsx file."""
+    import pathlib
+    from datetime import datetime
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        ui.notify("openpyxl not installed — run: pip install openpyxl", type="negative")
+        return
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Site Data Report"
+
+    # ── Column widths ──
+    ws.column_dimensions["A"].width = 40
+    ws.column_dimensions["B"].width = 58
+
+    # ── Styles ──
+    _hdr_font    = Font(name="Calibri", bold=True, size=13, color="FFFFFF")
+    _hdr_fill    = PatternFill("solid", fgColor="0B1F3A")
+    _sec_font    = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+    _sec_fill    = PatternFill("solid", fgColor="1B3A6B")
+    _lbl_font    = Font(name="Calibri", bold=True, size=10, color="101820")
+    _val_font    = Font(name="Calibri", size=10, color="2C3E50")
+    _thin_side   = Side(style="thin", color="C9D3E1")
+    _btm_border  = Border(bottom=_thin_side)
+    _wrap_top    = Alignment(wrap_text=True, vertical="top")
+    _center      = Alignment(horizontal="center", vertical="center")
+
+    _row = [1]  # mutable counter
+
+    def _next() -> int:
+        r = _row[0]; _row[0] += 1; return r
+
+    def write_header(text: str) -> None:
+        r = _next()
+        ws.row_dimensions[r].height = 22
+        for col in (1, 2):
+            c = ws.cell(row=r, column=col)
+            c.fill = _hdr_fill
+        ca = ws.cell(row=r, column=1, value=text)
+        ca.font = _hdr_font
+        ca.alignment = _center
+
+    def write_section(text: str) -> None:
+        _next()  # blank spacer row
+        r = _next()
+        ws.row_dimensions[r].height = 16
+        for col in (1, 2):
+            c = ws.cell(row=r, column=col)
+            c.fill = _sec_fill
+        ca = ws.cell(row=r, column=1, value=text)
+        ca.font = _sec_font
+
+    def write_field(label: str, value: Any) -> None:
+        r = _next()
+        ca = ws.cell(row=r, column=1, value=label)
+        ca.font = _lbl_font
+        ca.border = _btm_border
+        cb = ws.cell(row=r, column=2, value=str(value) if value else "")
+        cb.font = _val_font
+        cb.border = _btm_border
+        cb.alignment = _wrap_top
+        if value and "\n" in str(value):
+            ws.row_dimensions[r].height = max(15, str(value).count("\n") * 15 + 15)
+
+    # ── Report header ──
+    write_header("DEVELOPMENT CODE LOOKUP REPORT")
+    write_field("Generated", datetime.now().strftime("%Y-%m-%d  %H:%M"))
+    write_field("County", state.get("county", ""))
+    write_field("Parcel ID", state.get("parcel_id", ""))
+
+    # ── Property Data ──
+    write_section("PROPERTY DATA")
+    write_field("Address", state.get("address", ""))
+    write_field("City / Municipality", state.get("city", ""))
+    write_field("Zip Code", state.get("zip", ""))
+    write_field("Owner", state.get("owner", ""))
+    write_field("Land Use (DOR)", state.get("land_use", ""))
+    write_field("Site Area (acres)", state.get("site_area_acres", ""))
+    write_field("Site Area (sf)", state.get("site_area_sqft", ""))
+
+    # ── Site Description ──
+    write_section("SITE DESCRIPTION")
+    write_field("Tax Parcel ID(s)", state.get("tax_parcel", ""))
+    write_field("Description of Site Views", state.get("site_views", ""))
+    write_field("Adjoining Property Uses and Zoning", state.get("adjoining_uses", ""))
+    write_field("Proposed Zoning / Designation", state.get("proposed_zoning", ""))
+
+    # ── Zoning & Land Use ──
+    write_section("ZONING & LAND USE")
+    write_field("Zoning District", state.get("zoning", ""))
+    write_field("Future Land Use (FLUM)", state.get("future_land_use", ""))
+
+    # ── Parking ──
+    write_section("PARKING")
+    parking_uses = state.get("parking_uses", [])
+    if parking_uses:
+        for i, row in enumerate(parking_uses, 1):
+            use_type = row.get("use_type", "")
+            if not use_type:
+                continue
+            prefix = f"Use {i}: {use_type}"
+            write_field(prefix + " — Building SF GFA", row.get("building_sf", ""))
+            write_field(prefix + " — Units / Seats / Beds", row.get("num_units", ""))
+    else:
+        write_field("Proposed Use Type", state.get("use_type", ""))
+        write_field("Building Area (SF GFA)", state.get("building_sf", ""))
+        write_field("Number of Units / Seats / Beds", state.get("num_units", ""))
+
+    # ── Infrastructure & Utilities ──
+    write_section("INFRASTRUCTURE & UTILITIES")
+    write_field("Water Provider", state.get("utilities_water", ""))
+    write_field("Reclaimed Water Provider", state.get("utilities_reclaim", ""))
+    write_field("Sanitary Sewer Provider", state.get("utilities_sewer", ""))
+    write_field("Stormwater / Drainage", state.get("utilities_storm", ""))
+    write_field("Gas Provider", state.get("utilities_gas", ""))
+    write_field("Electric Provider", state.get("utilities_electric", ""))
+    write_field("Easements Required", state.get("easements_required", ""))
+    write_field("Utility Extensions Required", state.get("utility_extensions", ""))
+    write_field("Roadway Improvements / ROW Dedication", state.get("roadway_improvements", ""))
+    write_field("Signalization Required", state.get("signalization", ""))
+    write_field("Potential Encroachments", state.get("encroachments", ""))
+    write_field("Additional Access Available", state.get("additional_access", ""))
+
+    # ── Subdivision ──
+    write_section("SUBDIVISION")
+    write_field("Platting / Subdivision Requirements", state.get("platting", ""))
+    write_field("Anticipated Takings / Easements", state.get("takings_easements", ""))
+
+    # ── Environmental ──
+    write_section("ENVIRONMENTAL")
+    write_field("Storm Water Treatment Requirements", state.get("stormwater_treatment", ""))
+    write_field("Wetlands or Flood Plains Present", state.get("wetlands_flood", ""))
+    write_field("Setback / Elevation for Flood Plain", state.get("flood_elevation", ""))
+    write_field("Natural or Cultural Resources", state.get("natural_cultural", ""))
+    write_field("Environmental Considerations", state.get("env_considerations", ""))
+    write_field("Geotechnical Considerations", state.get("geotechnical", ""))
+    write_field("Impact Studies Required", state.get("impact_studies", ""))
+    write_field("Traffic Study Required", state.get("traffic_study", ""))
+
+    # ── Building ──
+    write_section("BUILDING")
+    write_field("Current Building Code", state.get("building_code", ""))
+    write_field("Unique Construction Methods", state.get("construction_methods", ""))
+    write_field("Fire Route Considerations", state.get("fire_route", ""))
+
+    # ── Fees ──
+    write_section("FEES")
+    write_field("Fire Plan Review", state.get("fee_fire_plan_review", ""))
+    write_field("Building Plan Review", state.get("fee_bldg_plan_review", ""))
+    write_field("Site Plan Review", state.get("fee_site_plan_review", ""))
+    write_field("Building Permit", state.get("fee_bldg_permit", ""))
+    write_field("Demo Permit", state.get("fee_demo_permit", ""))
+    write_field("ROW Dedication / Easements", state.get("fee_dedication", ""))
+    write_field("Securities & Utility Connection", state.get("fee_securities", ""))
+    write_field("Lot Line Adjustment", state.get("fee_lot_line_adj", ""))
+    write_field("Pre-Application Meeting", state.get("fee_pre_app", ""))
+    write_field("Coastal Development Permit", state.get("fee_coastal_dev", ""))
+
+    # ── Schedule ──
+    write_section("SCHEDULE")
+    write_field("Lot Line Adjustment", state.get("sched_lot_line_adj", ""))
+    write_field("Entitlements Process", state.get("sched_entitlements", ""))
+    write_field("Permitting Steps", state.get("sched_perm_steps", ""))
+    write_field("Local Permitting (County / City)", state.get("sched_local", ""))
+    write_field("SWFWMD Permitting", state.get("sched_wmd", ""))
+    write_field("FDEP Permitting", state.get("sched_fdep", ""))
+    write_field("FDOT Permitting", state.get("sched_fdot", ""))
+    write_field("Required Staff Meetings", state.get("sched_staff_meetings", ""))
+    write_field("Required Public Meetings", state.get("sched_public_meetings", ""))
+
+    # ── Save ──
+    reports_dir = pathlib.Path(__file__).parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    pid = (state.get("parcel_id") or "unknown").replace("-", "").replace(" ", "_")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{pid}_{ts}.xlsx" if pid != "unknown" else f"report_{ts}.xlsx"
+    out_path = reports_dir / filename
+    wb.save(str(out_path))
+    ui.notify(f"Saved: reports\\{filename}", type="positive", timeout=8000)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# CSS (adapted from proposal app)
+# ──────────────────────────────────────────────────────────────────────
 ui.add_css(
     """
     @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
@@ -549,6 +1434,20 @@ ui.add_css(
     .q-field:not(.q-field--textarea) .q-field__control {
         min-height: 40px;
         height: 40px;
+    }
+    .sir-textarea .q-field__control {
+        min-height: 120px !important;
+        align-items: flex-start !important;
+    }
+    .sir-textarea .q-field__native {
+        min-height: 100px !important;
+        height: auto !important;
+        overflow-y: auto !important;
+        resize: vertical;
+        vertical-align: top !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        padding-top: 6px !important;
     }
     .q-field--focused .q-field__control {
         border-color: var(--navy);
@@ -609,19 +1508,37 @@ ui.add_css(
     .code-field { width: 500px !important; max-width: 500px !important; }
     .code-field .q-field__control { width: 500px !important; }
     .code-field input { width: 500px !important; }
+    .fee-expansion { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 4px; }
+    .fee-expansion .q-expansion-item__content { padding: 8px 16px 12px; }
+    .fee-line { font-size: 0.85rem; color: #2c3e50; padding: 1px 0; line-height: 1.5; white-space: pre-wrap; }
+    .link-btn { font-size: 0.8rem !important; text-transform: none !important; font-weight: 500; }
+    .export-btn { font-size: 0.85rem !important; font-weight: 600; }
     """
 )
 
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 # Main layout
-# ---------------------------------------------------------------------------
-ui.label("Pinellas County Development Code Lookup").classes("text-h4 q-mb-sm")
-ui.label("Unincorporated Pinellas County, FL — Chapter 138 Land Development Code").classes("muted q-mb-md")
+# ──────────────────────────────────────────────────────────────────────
+ui.label("Development Code Lookup").classes("text-h4 q-mb-sm")
+ui.label("Florida — Pinellas & Pasco Counties · Land Development Code & Comprehensive Plan").classes("muted q-mb-md")
+
+with ui.row().classes("w-full items-center justify-between q-mb-sm"):
+    ui.button(
+        "EXPORT TO EXCEL",
+        on_click=generate_excel_report,
+        icon="download",
+        color="positive",
+    ).props("outline").classes("export-btn")
+    ui.label("Exports all fields from every tab to a .xlsx file in the reports/ folder.").classes("muted")
 
 with ui.tabs().classes("tabs-left") as tabs:
     tab1 = ui.tab("Property Lookup")
     tab2 = ui.tab("Requirements")
     tab3 = ui.tab("Parking")
+    tab4 = ui.tab("Landscape")
+    tab5 = ui.tab("Infrastructure")
+    tab6 = ui.tab("Environmental")
+    tab7 = ui.tab("Fees & Schedule")
 
 with ui.tab_panels(tabs, value=tab1).classes("w-full"):
     with ui.tab_panel(tab1):
@@ -633,10 +1550,23 @@ with ui.tab_panels(tabs, value=tab1).classes("w-full"):
     with ui.tab_panel(tab3):
         with ui.card().classes("w-full tab-card"):
             render_tab_parking()
+    with ui.tab_panel(tab4):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_landscape()
+    with ui.tab_panel(tab5):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_infrastructure()
+    with ui.tab_panel(tab6):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_environmental()
+    with ui.tab_panel(tab7):
+        with ui.card().classes("w-full tab-card"):
+            render_tab_fees_schedule()
 
 ui.run(
     title="Dev Code Lookup",
-    port=8080,
-    reload=True,
-    show=True,
+    port=8081,
+    show=False,
+    reload=False,
+    reconnect_timeout=30,
 )

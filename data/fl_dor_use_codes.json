@@ -1,0 +1,402 @@
+{
+  "000": {
+    "description": "Vacant Residential",
+    "category": "Residential"
+  },
+  "001": {
+    "description": "Single Family",
+    "category": "Residential"
+  },
+  "002": {
+    "description": "Mobile Homes",
+    "category": "Residential"
+  },
+  "004": {
+    "description": "Condominiums",
+    "category": "Residential"
+  },
+  "005": {
+    "description": "Cooperatives",
+    "category": "Residential"
+  },
+  "006": {
+    "description": "Retirement Homes not eligible for exemption",
+    "category": "Residential"
+  },
+  "007": {
+    "description": "Miscellaneous Residential (migrant camps, boarding homes, etc.)",
+    "category": "Residential"
+  },
+  "008": {
+    "description": "Multi-family - fewer than 10 units",
+    "category": "Residential"
+  },
+  "009": {
+    "description": "Residential Common Elements/Areas",
+    "category": "Residential"
+  },
+  "003": {
+    "description": "Multi-family - 10 units or more",
+    "category": "Commercial"
+  },
+  "010": {
+    "description": "Vacant Commercial",
+    "category": "Commercial"
+  },
+  "011": {
+    "description": "Stores, one story",
+    "category": "Commercial"
+  },
+  "012": {
+    "description": "Mixed use - store and office or store and residential combination",
+    "category": "Commercial"
+  },
+  "013": {
+    "description": "Department Stores",
+    "category": "Commercial"
+  },
+  "014": {
+    "description": "Supermarkets",
+    "category": "Commercial"
+  },
+  "015": {
+    "description": "Regional Shopping Centers",
+    "category": "Commercial"
+  },
+  "016": {
+    "description": "Community Shopping Centers",
+    "category": "Commercial"
+  },
+  "017": {
+    "description": "Office buildings, non-professional service buildings, one story",
+    "category": "Commercial"
+  },
+  "018": {
+    "description": "Office buildings, non-professional service buildings, multi-story",
+    "category": "Commercial"
+  },
+  "019": {
+    "description": "Professional service buildings",
+    "category": "Commercial"
+  },
+  "020": {
+    "description": "Airports (private or commercial), bus terminals, marine terminals, piers, marinas",
+    "category": "Commercial"
+  },
+  "021": {
+    "description": "Restaurants, cafeterias",
+    "category": "Commercial"
+  },
+  "022": {
+    "description": "Drive-in Restaurants",
+    "category": "Commercial"
+  },
+  "023": {
+    "description": "Financial institutions (banks, saving and loan companies, mortgage companies, credit services)",
+    "category": "Commercial"
+  },
+  "024": {
+    "description": "Insurance company offices",
+    "category": "Commercial"
+  },
+  "025": {
+    "description": "Repair service shops (excluding automotive), radio and T.V. repair, refrigeration service, electric repair, laundries, Laundromats",
+    "category": "Commercial"
+  },
+  "026": {
+    "description": "Service stations",
+    "category": "Commercial"
+  },
+  "027": {
+    "description": "Auto sales, auto repair and storage, auto service shops, body and fender shops, commercial garages, farm and machinery sales and services, auto rental, marine equipment, trailers and related equipment, mobile home sales, motorcycles, construction vehicle sales",
+    "category": "Commercial"
+  },
+  "028": {
+    "description": "Parking lots (commercial or patron), mobile home parks",
+    "category": "Commercial"
+  },
+  "029": {
+    "description": "Wholesale outlets, produce houses, manufacturing outlets",
+    "category": "Commercial"
+  },
+  "030": {
+    "description": "Florists, greenhouses",
+    "category": "Commercial"
+  },
+  "031": {
+    "description": "Drive-in theaters, open stadiums",
+    "category": "Commercial"
+  },
+  "032": {
+    "description": "Enclosed theaters, enclosed auditoriums",
+    "category": "Commercial"
+  },
+  "033": {
+    "description": "Nightclubs, cocktail lounges, bars",
+    "category": "Commercial"
+  },
+  "034": {
+    "description": "Bowling alleys, skating rinks, pool halls, enclosed arenas",
+    "category": "Commercial"
+  },
+  "035": {
+    "description": "Tourist attractions, permanent exhibits, other entertainment facilities, fairgrounds (privately owned)",
+    "category": "Commercial"
+  },
+  "036": {
+    "description": "Camps",
+    "category": "Commercial"
+  },
+  "037": {
+    "description": "Race tracks (horse, auto, or dog)",
+    "category": "Commercial"
+  },
+  "038": {
+    "description": "Golf courses, driving ranges",
+    "category": "Commercial"
+  },
+  "039": {
+    "description": "Hotels, motels",
+    "category": "Commercial"
+  },
+  "040": {
+    "description": "Vacant Industrial",
+    "category": "Industrial"
+  },
+  "041": {
+    "description": "Light manufacturing, small equipment manufacturing plants, small machine shops, instrument manufacturing, printing plants",
+    "category": "Industrial"
+  },
+  "042": {
+    "description": "Heavy industrial, heavy equipment manufacturing, large machine shops, foundries, steel fabricating plants, auto or aircraft plants",
+    "category": "Industrial"
+  },
+  "043": {
+    "description": "Lumber yards, sawmills, planing mills",
+    "category": "Industrial"
+  },
+  "044": {
+    "description": "Packing plants, fruit and vegetable packing plants, meat packing plants",
+    "category": "Industrial"
+  },
+  "045": {
+    "description": "Canneries, fruit and vegetable, bottlers and brewers, distilleries, wineries",
+    "category": "Industrial"
+  },
+  "046": {
+    "description": "Other food processing, candy factories, bakeries, potato chip factories",
+    "category": "Industrial"
+  },
+  "047": {
+    "description": "Mineral processing, phosphate processing, cement plants, refineries, clay plants, rock and gravel plants",
+    "category": "Industrial"
+  },
+  "048": {
+    "description": "Warehousing, distribution terminals, trucking terminals, van and storage warehousing",
+    "category": "Industrial"
+  },
+  "049": {
+    "description": "Open storage, new and used building supplies, junk yards, auto wrecking, fuel storage, equipment and material storage",
+    "category": "Industrial"
+  },
+  "050": {
+    "description": "Improved agricultural",
+    "category": "Agricultural"
+  },
+  "051": {
+    "description": "Cropland soil capability Class I",
+    "category": "Agricultural"
+  },
+  "052": {
+    "description": "Cropland soil capability Class II",
+    "category": "Agricultural"
+  },
+  "053": {
+    "description": "Cropland soil capability Class III",
+    "category": "Agricultural"
+  },
+  "054": {
+    "description": "Timberland - site index 90 and above",
+    "category": "Agricultural"
+  },
+  "055": {
+    "description": "Timberland - site index 80 to 89",
+    "category": "Agricultural"
+  },
+  "056": {
+    "description": "Timberland - site index 70 to 79",
+    "category": "Agricultural"
+  },
+  "057": {
+    "description": "Timberland - site index 60 to 69",
+    "category": "Agricultural"
+  },
+  "058": {
+    "description": "Timberland - site index 50 to 59",
+    "category": "Agricultural"
+  },
+  "059": {
+    "description": "Timberland not classified by site index to Pines",
+    "category": "Agricultural"
+  },
+  "060": {
+    "description": "Grazing land soil capability Class I",
+    "category": "Agricultural"
+  },
+  "061": {
+    "description": "Grazing land soil capability Class II",
+    "category": "Agricultural"
+  },
+  "062": {
+    "description": "Grazing land soil capability Class III",
+    "category": "Agricultural"
+  },
+  "063": {
+    "description": "Grazing land soil capability Class IV",
+    "category": "Agricultural"
+  },
+  "064": {
+    "description": "Grazing land soil capability Class V",
+    "category": "Agricultural"
+  },
+  "065": {
+    "description": "Grazing land soil capability Class VI",
+    "category": "Agricultural"
+  },
+  "066": {
+    "description": "Orchard Groves, citrus, etc.",
+    "category": "Agricultural"
+  },
+  "067": {
+    "description": "Poultry, bees, tropical fish, rabbits, etc.",
+    "category": "Agricultural"
+  },
+  "068": {
+    "description": "Dairies, feed lots",
+    "category": "Agricultural"
+  },
+  "069": {
+    "description": "Ornamentals, miscellaneous agricultural",
+    "category": "Agricultural"
+  },
+  "070": {
+    "description": "Vacant Institutional, with or without extra features",
+    "category": "Institutional"
+  },
+  "071": {
+    "description": "Churches",
+    "category": "Institutional"
+  },
+  "072": {
+    "description": "Private schools and colleges",
+    "category": "Institutional"
+  },
+  "073": {
+    "description": "Privately owned hospitals",
+    "category": "Institutional"
+  },
+  "074": {
+    "description": "Homes for the aged",
+    "category": "Institutional"
+  },
+  "075": {
+    "description": "Orphanages, other non-profit or charitable services",
+    "category": "Institutional"
+  },
+  "076": {
+    "description": "Mortuaries, cemeteries, crematoriums",
+    "category": "Institutional"
+  },
+  "077": {
+    "description": "Clubs, lodges, union halls",
+    "category": "Institutional"
+  },
+  "078": {
+    "description": "Sanitariums, convalescent and rest homes",
+    "category": "Institutional"
+  },
+  "079": {
+    "description": "Cultural organizations, facilities",
+    "category": "Institutional"
+  },
+  "080": {
+    "description": "Vacant Governmental",
+    "category": "Governmental"
+  },
+  "081": {
+    "description": "Military",
+    "category": "Governmental"
+  },
+  "082": {
+    "description": "Forest, parks, recreational areas",
+    "category": "Governmental"
+  },
+  "083": {
+    "description": "Public county schools - including all property of Board of Public Instruction",
+    "category": "Governmental"
+  },
+  "084": {
+    "description": "Colleges (non-private)",
+    "category": "Governmental"
+  },
+  "085": {
+    "description": "Hospitals (non-private)",
+    "category": "Governmental"
+  },
+  "086": {
+    "description": "Counties (other than public schools, colleges, hospitals) including non-municipal government",
+    "category": "Governmental"
+  },
+  "087": {
+    "description": "State, other than military, forests, parks, recreational areas, colleges, hospitals",
+    "category": "Governmental"
+  },
+  "088": {
+    "description": "Federal, other than military, forests, parks, recreational areas, hospitals, colleges",
+    "category": "Governmental"
+  },
+  "089": {
+    "description": "Municipal, other than parks, recreational areas, colleges, hospitals",
+    "category": "Governmental"
+  },
+  "090": {
+    "description": "Leasehold interests (government-owned property leased by a non-governmental lessee)",
+    "category": "Miscellaneous"
+  },
+  "091": {
+    "description": "Utility, gas and electricity, telephone and telegraph, locally assessed railroads, water and sewer service, pipelines, canals, radio/television communication",
+    "category": "Miscellaneous"
+  },
+  "092": {
+    "description": "Mining lands, petroleum lands, or gas lands",
+    "category": "Miscellaneous"
+  },
+  "093": {
+    "description": "Subsurface rights",
+    "category": "Miscellaneous"
+  },
+  "094": {
+    "description": "Right-of-way, streets, roads, irrigation channel, ditch, etc.",
+    "category": "Miscellaneous"
+  },
+  "095": {
+    "description": "Rivers and lakes, submerged lands",
+    "category": "Miscellaneous"
+  },
+  "096": {
+    "description": "Sewage disposal, solid waste, borrow pits, drainage reservoirs, waste land, marsh, sand dunes, swamps",
+    "category": "Miscellaneous"
+  },
+  "097": {
+    "description": "Outdoor recreational or parkland, or high-water recharge subject to classified use assessment",
+    "category": "Miscellaneous"
+  },
+  "098": {
+    "description": "Centrally assessed",
+    "category": "Centrally Assessed"
+  },
+  "099": {
+    "description": "Acreage not zoned agricultural with or without extra features",
+    "category": "Non-Agricultural Acreage"
+  }
+}

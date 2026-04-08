@@ -1,4 +1,6 @@
 {
+  "_source": "Pasco County Land Development Code (LDC) Section 500.3 — Off-Street Parking and Loading Requirements",
+  "_url": "https://library.municode.com/fl/pasco_county/codes/land_development_code",
   "parking_requirements": {
     "Single Family Detached": {
       "min_rate": "2 per dwelling unit",
@@ -19,14 +21,14 @@
       "max_limit": null
     },
     "Multi-Family (Studio/1BR)": {
-      "min_rate": "1.25 per dwelling unit",
-      "min_per_unit": 1.25,
+      "min_rate": "1.5 per dwelling unit",
+      "min_per_unit": 1.5,
       "unit": "dwelling unit",
       "max_limit": null
     },
     "Multi-Family (2+ BR)": {
-      "min_rate": "1.5 per dwelling unit",
-      "min_per_unit": 1.5,
+      "min_rate": "2 per dwelling unit",
+      "min_per_unit": 2.0,
       "unit": "dwelling unit",
       "max_limit": null
     },
@@ -36,50 +38,56 @@
       "unit": "bed",
       "max_limit": null
     },
+    "Mobile Home": {
+      "min_rate": "2 per dwelling unit",
+      "min_per_unit": 2.0,
+      "unit": "dwelling unit",
+      "max_limit": null
+    },
     "Office (General)": {
-      "min_rate": "3 per 1,000 sf GFA",
-      "min_per_unit": 3.0,
+      "min_rate": "3.5 per 1,000 sf GFA",
+      "min_per_unit": 3.5,
       "unit": "1,000 sf GFA",
-      "max_limit": "4 per 1,000 sf GFA"
+      "max_limit": null
     },
     "Office (Medical/Dental)": {
-      "min_rate": "4 per 1,000 sf GFA",
-      "min_per_unit": 4.0,
+      "min_rate": "5 per 1,000 sf GFA",
+      "min_per_unit": 5.0,
       "unit": "1,000 sf GFA",
-      "max_limit": "5 per 1,000 sf GFA"
+      "max_limit": null
     },
     "Retail (General)": {
-      "min_rate": "3 per 1,000 sf GFA",
-      "min_per_unit": 3.0,
+      "min_rate": "4.5 per 1,000 sf GFA",
+      "min_per_unit": 4.5,
       "unit": "1,000 sf GFA",
-      "max_limit": "5 per 1,000 sf GFA"
+      "max_limit": null
     },
     "Shopping Center": {
-      "min_rate": "4 per 1,000 sf GFA",
-      "min_per_unit": 4.0,
+      "min_rate": "5 per 1,000 sf GFA",
+      "min_per_unit": 5.0,
       "unit": "1,000 sf GFA",
-      "max_limit": "5 per 1,000 sf GFA"
+      "max_limit": null
     },
     "Restaurant (Sit-down)": {
-      "min_rate": "8 per 1,000 sf GFA",
-      "min_per_unit": 8.0,
-      "unit": "1,000 sf GFA",
-      "max_limit": "12 per 1,000 sf GFA"
-    },
-    "Restaurant (Fast Food)": {
-      "min_rate": "10 per 1,000 sf GFA",
+      "min_rate": "10 per 1,000 sf GFA (or 1 per 75 sf dining)",
       "min_per_unit": 10.0,
       "unit": "1,000 sf GFA",
-      "max_limit": "15 per 1,000 sf GFA"
+      "max_limit": null
+    },
+    "Restaurant (Fast Food)": {
+      "min_rate": "12 per 1,000 sf GFA",
+      "min_per_unit": 12.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": null
     },
     "Convenience Store": {
-      "min_rate": "4 per 1,000 sf GFA",
-      "min_per_unit": 4.0,
+      "min_rate": "5 per 1,000 sf GFA",
+      "min_per_unit": 5.0,
       "unit": "1,000 sf GFA",
       "max_limit": null
     },
     "Hotel/Motel": {
-      "min_rate": "1 per guest room + 3 per 1,000 sf meeting/restaurant",
+      "min_rate": "1 per guest room + 1 per employee peak shift",
       "min_per_unit": 1.0,
       "unit": "guest room",
       "max_limit": null
@@ -88,13 +96,19 @@
       "min_rate": "1 per 1,000 sf GFA",
       "min_per_unit": 1.0,
       "unit": "1,000 sf GFA",
-      "max_limit": "2 per 1,000 sf GFA"
+      "max_limit": null
     },
     "Light Manufacturing": {
-      "min_rate": "2 per 1,000 sf GFA",
-      "min_per_unit": 2.0,
+      "min_rate": "1.5 per 1,000 sf GFA",
+      "min_per_unit": 1.5,
       "unit": "1,000 sf GFA",
-      "max_limit": "3 per 1,000 sf GFA"
+      "max_limit": null
+    },
+    "Heavy Industrial": {
+      "min_rate": "1 per 1,000 sf GFA",
+      "min_per_unit": 1.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": null
     },
     "Self-Storage": {
       "min_rate": "1 per 5,000 sf GFA + 2 for office",
@@ -138,65 +152,30 @@
       "unit": "1,000 sf GFA",
       "max_limit": null
     },
-    "Marina": {
-      "min_rate": "0.5 per wet slip + 0.25 per dry slip",
-      "min_per_unit": 0.5,
-      "unit": "wet slip",
+    "Golf Course": {
+      "min_rate": "4 per hole",
+      "min_per_unit": 4.0,
+      "unit": "hole",
+      "max_limit": null
+    },
+    "Nursery / Garden Center": {
+      "min_rate": "2 per 1,000 sf GFA",
+      "min_per_unit": 2.0,
+      "unit": "1,000 sf GFA",
       "max_limit": null
     }
   },
   "ada_parking_table": [
-    {
-      "total_spaces_min": 1,
-      "total_spaces_max": 25,
-      "accessible_required": 1
-    },
-    {
-      "total_spaces_min": 26,
-      "total_spaces_max": 50,
-      "accessible_required": 2
-    },
-    {
-      "total_spaces_min": 51,
-      "total_spaces_max": 75,
-      "accessible_required": 3
-    },
-    {
-      "total_spaces_min": 76,
-      "total_spaces_max": 100,
-      "accessible_required": 4
-    },
-    {
-      "total_spaces_min": 101,
-      "total_spaces_max": 150,
-      "accessible_required": 5
-    },
-    {
-      "total_spaces_min": 151,
-      "total_spaces_max": 200,
-      "accessible_required": 6
-    },
-    {
-      "total_spaces_min": 201,
-      "total_spaces_max": 300,
-      "accessible_required": 7
-    },
-    {
-      "total_spaces_min": 301,
-      "total_spaces_max": 400,
-      "accessible_required": 8
-    },
-    {
-      "total_spaces_min": 401,
-      "total_spaces_max": 500,
-      "accessible_required": 9
-    },
-    {
-      "total_spaces_min": 501,
-      "total_spaces_max": 1000,
-      "accessible_required": 10,
-      "note": "2% of total (minimum 10)"
-    }
+    {"total_spaces_min": 1,   "total_spaces_max": 25,   "accessible_required": 1},
+    {"total_spaces_min": 26,  "total_spaces_max": 50,   "accessible_required": 2},
+    {"total_spaces_min": 51,  "total_spaces_max": 75,   "accessible_required": 3},
+    {"total_spaces_min": 76,  "total_spaces_max": 100,  "accessible_required": 4},
+    {"total_spaces_min": 101, "total_spaces_max": 150,  "accessible_required": 5},
+    {"total_spaces_min": 151, "total_spaces_max": 200,  "accessible_required": 6},
+    {"total_spaces_min": 201, "total_spaces_max": 300,  "accessible_required": 7},
+    {"total_spaces_min": 301, "total_spaces_max": 400,  "accessible_required": 8},
+    {"total_spaces_min": 401, "total_spaces_max": 500,  "accessible_required": 9},
+    {"total_spaces_min": 501, "total_spaces_max": 1000, "accessible_required": 10, "note": "2% of total (minimum 10)"}
   ],
   "parking_dimensions": {
     "90_degree": {
@@ -204,7 +183,7 @@
       "stall_width": 9.0,
       "stall_depth": 18.0,
       "aisle_width_two_way": 24.0,
-      "aisle_width_one_way": 24.0
+      "aisle_width_one_way": 22.0
     },
     "60_degree": {
       "angle": 60,
@@ -218,7 +197,7 @@
       "stall_width": 9.0,
       "stall_depth": 18.0,
       "aisle_width_two_way": 24.0,
-      "aisle_width_one_way": 15.0
+      "aisle_width_one_way": 14.0
     },
     "parallel": {
       "angle": 0,
@@ -230,13 +209,19 @@
     "accessible": {
       "stall_width": 12.0,
       "stall_depth": 18.0,
-      "note": "Diagonal or perpendicular accessible stalls"
+      "note": "ADA standard: 8 ft stall + 5 ft access aisle (13 ft total); van-accessible: 8 ft + 8 ft aisle (16 ft total)"
     }
   },
   "bicycle_parking": {
-    "general_rule": "1 bicycle space per 20 motor vehicle spaces required, minimum 2",
+    "general_rule": "1 bicycle space per 20 motor vehicle spaces required, minimum 2 (LDC Sec. 500.3)",
     "calculation_formula": "1 bicycle space per 20 motor vehicle spaces required, minimum 2",
     "min_spaces": 2,
     "spaces_per_motor_vehicle": 20
+  },
+  "loading_requirements": {
+    "0-9999": "No loading berth required (unless use requires deliveries)",
+    "10000-49999": "1 berth (min 12 ft × 35 ft × 14 ft vertical clearance)",
+    "50000-99999": "2 berths",
+    "100000+": "3 berths + 1 per additional 100,000 sf GFA"
   }
 }

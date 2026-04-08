@@ -1,13 +1,17 @@
 """
-Web scraping utilities for the Dev Code Lookup app.
+tools/scraper.py — Web scraping utilities for county property appraiser systems.
 
-Contains county property appraiser scrapers and HTTP session helpers.
+Extracted from app.py. Includes:
+- get_resilient_session(): requests.Session with retry strategy
+- scrape_pinellas_property(): PCPAO parcel data scraper
+- expand_city_name(): Pinellas city abbreviation expander
+- strip_dor_code(): Florida DOR code prefix stripper
 """
+
 from __future__ import annotations
 
-import re
 import json
-import logging
+import re
 from pathlib import Path
 from typing import Dict, Any
 
@@ -16,27 +20,74 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-logger = logging.getLogger(__name__)
 
-_DATA_DIR = Path(__file__).parent.parent / "data" / "pinellas"
-
-_MAPS_CACHE: dict | None = None
-
-
-def _get_maps() -> dict:
-    global _MAPS_CACHE
-    if _MAPS_CACHE is None:
-        with open(_DATA_DIR / "maps.json") as f:
-            _MAPS_CACHE = json.load(f)
-    return _MAPS_CACHE
+def _load_city_map() -> Dict[str, str]:
+    path = Path(__file__).parent.parent / "data" / "pinellas" / "maps.json"
+    with path.open() as f:
+        data = json.load(f)
+    return data.get("city_map", {})
 
 
-# ---------------------------------------------------------------------------
-# HTTP session
-# ---------------------------------------------------------------------------
+def expand_city_name(city_abbr: str) -> str:
+    if not city_abbr:
+        return "Unincorporated Pinellas"
+    city_map = _load_city_map()
+    return city_map.get(city_abbr.strip().upper(), city_abbr)
+
+
+def _load_dor_use_codes() -> Dict[str, Any]:
+    path = Path(__file__).parent.parent / "data" / "fl_dor_use_codes.json"
+    if path.exists():
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+_DOR_USE_CODES: Dict[str, Any] = {}
+
+
+def lookup_dor_use_code(raw: str) -> str:
+    """
+    Given a raw DOR land use string from a property appraiser system
+    (e.g. '48 WAREHOUSING' or '048' or '0048 Warehousing...'), extract
+    the DOR code number and return a formatted string:
+        '048 — Warehousing, distribution terminals... (Industrial)'
+    Falls back to cleaning the raw string if no match found.
+    """
+    global _DOR_USE_CODES
+    if not _DOR_USE_CODES:
+        _DOR_USE_CODES = _load_dor_use_codes()
+
+    if not raw:
+        return ""
+    text = raw.strip()
+
+    # Extract leading numeric code (1-3 digits)
+    m = re.match(r'^(\d{1,3})\b', text)
+    if m:
+        code_num = m.group(1).zfill(3)  # zero-pad to 3 digits
+        entry = _DOR_USE_CODES.get(code_num)
+        if entry:
+            category = entry.get("category", "")
+            desc = entry["description"]
+            if category:
+                return f"{code_num} — {desc} ({category})"
+            return f"{code_num} — {desc}"
+        # Code found but not in our table — return cleaned text
+        rest = text[m.end():].strip()
+        return f"{code_num} — {rest}" if rest else code_num
+
+    # No leading code — return as-is, cleaned
+    return text
+
+
+# Keep old name as alias for backward compatibility
+def strip_dor_code(land_use_text: str) -> str:
+    return lookup_dor_use_code(land_use_text)
+
+
 
 def get_resilient_session() -> requests.Session:
-    """Return an HTTP session with automatic retry logic."""
     session = requests.Session()
     retry_strategy = Retry(
         total=3,
@@ -50,43 +101,7 @@ def get_resilient_session() -> requests.Session:
     return session
 
 
-# ---------------------------------------------------------------------------
-# City / land-use name helpers
-# ---------------------------------------------------------------------------
-
-def expand_city_name(city_abbr: str) -> str:
-    """Expand PCPAO city abbreviation to a full display name."""
-    if not city_abbr:
-        return "Unincorporated Pinellas"
-    city_map: dict = _get_maps().get("city_map", {})
-    return city_map.get(city_abbr.strip().upper(), city_abbr)
-
-
-def strip_dor_code(land_use_text: str) -> str:
-    """Remove leading DOR numeric code from a land-use string, e.g. '01 Single Family' → 'Single Family'."""
-    if not land_use_text:
-        return ""
-    text = land_use_text.strip()
-    if text and text[0].isdigit():
-        parts = text.split(" ", 1)
-        if len(parts) > 1:
-            return parts[1].strip()
-    return text
-
-
-# ---------------------------------------------------------------------------
-# Pinellas County scraper
-# ---------------------------------------------------------------------------
-
 def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
-    """
-    Query PCPAO for a Pinellas County parcel and return a standardised dict.
-
-    Returns:
-        dict with keys: success, parcel_id, address, city, zip, owner,
-        land_use, site_area_sqft, site_area_acres, legal_description,
-        strap, tax_district
-    """
     session = get_resilient_session()
     url = "https://www.pcpao.gov/dal/quicksearch/searchProperty"
 
@@ -183,3 +198,339 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
         }
     except Exception as exc:
         return {"success": False, "error": f"Error querying PCPAO API: {str(exc)}"}
+
+
+def _fmt_adj(use_map: Dict[str, str]) -> str:
+    if not use_map:
+        return ""
+    parts = list(use_map.values())
+    return "Adjacent land uses: " + "; ".join(parts[:6])  # cap at 6 for readability
+
+
+def _pasco_adjacent_uses(session: requests.Session, parcel_id: str, rings: list) -> str:
+    """Return formatted adjacent land use string using parcel envelope + Pasco ArcGIS."""
+    pts = rings[0] if rings else []
+    if not pts:
+        return ""
+    min_x = min(p[0] for p in pts)
+    max_x = max(p[0] for p in pts)
+    min_y = min(p[1] for p in pts)
+    max_y = max(p[1] for p in pts)
+    pad = 15  # ~50 ft in web mercator metres
+    envelope = json.dumps({
+        "xmin": min_x - pad, "ymin": min_y - pad,
+        "xmax": max_x + pad, "ymax": max_y + pad,
+        "spatialReference": {"wkid": 102100},
+    })
+    try:
+        r = session.get(
+            "https://maps.pascopa.com/arcgis/rest/services/Parcels/MapServer/3/query",
+            params={
+                "geometry": envelope,
+                "geometryType": "esriGeometryEnvelope",
+                "inSR": "102100",
+                "spatialRel": "esriSpatialRelIntersects",
+                "where": f"ParcelID <> '{parcel_id.replace(chr(39), chr(39)+chr(39))}'",
+                "outFields": "DIR_CLASS,PHYS_CITY",
+                "returnGeometry": "false",
+                "f": "json",
+            },
+            timeout=15,
+        )
+        feats = r.json().get("features", [])
+        seen: Dict[str, str] = {}
+        for f in feats:
+            a = f.get("attributes") or {}
+            code = str(a.get("DIR_CLASS") or "").strip().zfill(3)
+            desc = lookup_dor_use_code(code)
+            if desc and code not in seen:
+                seen[code] = desc
+        return _fmt_adj(seen)
+    except Exception:
+        return ""
+
+
+def get_pinellas_adjacent_uses(parcel_id: str) -> str:
+    """Query EGIS Pinellas Parcels for geometry of parcel then find adjacent USE_CODEs."""
+    session = get_resilient_session()
+    base = "https://egis.pinellas.gov/gis/rest/services/PublicWebGIS/Parcels/MapServer/1/query"
+    digits = re.sub(r"[^0-9]", "", parcel_id)
+    dsp = parcel_id.strip()
+    where = (
+        f"PARCELID_DSP1='{dsp}' OR PARCELID_DSP2='{dsp}'"
+        + (f" OR STRAP='{digits}' OR PARCELID='{digits}'" if digits else "")
+    )
+    try:
+        # Step 1: get geometry of subject parcel
+        r = session.get(base, params={
+            "where": where, "outFields": "PARCELID",
+            "returnGeometry": "true", "outSR": "4326", "f": "json",
+        }, timeout=15)
+        feats = r.json().get("features", [])
+        if not feats:
+            return ""
+        rings = (feats[0].get("geometry") or {}).get("rings", [])
+        pts = rings[0] if rings else []
+        if not pts:
+            return ""
+        # Step 2: build envelope and query adjacent parcels
+        min_x = min(p[0] for p in pts)
+        max_x = max(p[0] for p in pts)
+        min_y = min(p[1] for p in pts)
+        max_y = max(p[1] for p in pts)
+        pad = 0.0003  # ~30 m in decimal degrees
+        envelope = json.dumps({
+            "xmin": min_x - pad, "ymin": min_y - pad,
+            "xmax": max_x + pad, "ymax": max_y + pad,
+            "spatialReference": {"wkid": 4326},
+        })
+        excl = f"PARCELID<>'{digits}'" if digits else "1=1"
+        r2 = session.get(base, params={
+            "geometry": envelope,
+            "geometryType": "esriGeometryEnvelope",
+            "inSR": "4326",
+            "spatialRel": "esriSpatialRelIntersects",
+            "where": excl,
+            "outFields": "USE_CODE,LAND_USE_CODE",
+            "returnGeometry": "false",
+            "f": "json",
+        }, timeout=15)
+        feats2 = r2.json().get("features", [])
+        seen: Dict[str, str] = {}
+        for f in feats2:
+            a = f.get("attributes") or {}
+            code = str(a.get("USE_CODE") or a.get("LAND_USE_CODE") or "").strip()
+            desc = lookup_dor_use_code(code)
+            if desc and code not in seen:
+                seen[code] = desc
+        return _fmt_adj(seen)
+    except Exception:
+        return ""
+
+
+def _pasco_spatial_lookup(session: requests.Session, cx: float, cy: float) -> Dict[str, str]:
+    """Given a parcel centroid (web mercator), return zoning and FLUM codes."""
+    geom = json.dumps({"x": cx, "y": cy, "spatialReference": {"wkid": 102100}})
+    params = {
+        "geometry": geom,
+        "geometryType": "esriGeometryPoint",
+        "spatialRel": "esriSpatialRelIntersects",
+        "inSR": "102100",
+        "returnGeometry": "false",
+        "f": "json",
+    }
+
+    zoning_code = ""
+    zoning_desc = ""
+    flum_code = ""
+    flum_desc = ""
+
+    try:
+        rz = session.get(
+            "https://services6.arcgis.com/Mo4MddfRHpFwT7UF/arcgis/rest/services/Zoning_Areas/FeatureServer/9/query",
+            params={**params, "outFields": "ZONEID,ZN_TYPE"},
+            timeout=15,
+        )
+        zfeats = rz.json().get("features", [])
+        if zfeats:
+            zone_id = zfeats[0]["attributes"].get("ZONEID")
+            zoning_code = str(zfeats[0]["attributes"].get("ZN_TYPE") or "").strip()
+            if zone_id:
+                rd = session.get(
+                    "https://services6.arcgis.com/Mo4MddfRHpFwT7UF/arcgis/rest/services/Zoning_Areas/FeatureServer/10/query",
+                    params={"where": f"ZONEID={zone_id}", "outFields": "ZN_TYPE,ZN_DESC", "returnGeometry": "false", "f": "json"},
+                    timeout=15,
+                )
+                dfeats = rd.json().get("features", [])
+                if dfeats:
+                    zoning_desc = str(dfeats[0]["attributes"].get("ZN_DESC") or "").strip()
+    except Exception:
+        pass
+
+    try:
+        rf = session.get(
+            "https://services6.arcgis.com/Mo4MddfRHpFwT7UF/arcgis/rest/services/Future_Landuse_2025/FeatureServer/7/query",
+            params={**params, "outFields": "FLU_CODE,DESCRIPTION"},
+            timeout=15,
+        )
+        ffeats = rf.json().get("features", [])
+        if ffeats:
+            flum_code = str(ffeats[0]["attributes"].get("FLU_CODE") or "").strip()
+            flum_desc = str(ffeats[0]["attributes"].get("DESCRIPTION") or "").strip()
+    except Exception:
+        pass
+
+    return {
+        "zoning": zoning_code,
+        "zoning_description": zoning_desc,
+        "future_land_use": flum_code,
+        "flum_description": flum_desc,
+    }
+
+
+_PASCO_ZIP_CITY: Dict[str, str] = {
+    "33523": "Dade City",
+    "33524": "Dade City",
+    "33525": "Dade City",
+    "33526": "Dade City",
+    "33540": "Zephyrhills",
+    "33541": "Zephyrhills",
+    "33542": "Zephyrhills",
+    "33543": "Wesley Chapel",
+    "33544": "Wesley Chapel",
+    "33545": "Wesley Chapel",
+    "33556": "Odessa",
+    "33558": "Lutz",
+    "33559": "Lutz",
+    "33576": "San Antonio",
+    "33597": "Trilby",
+    "34610": "Spring Hill",
+    "34637": "Land O' Lakes",
+    "34638": "Land O' Lakes",
+    "34639": "Land O' Lakes",
+    "34652": "New Port Richey",
+    "34653": "New Port Richey",
+    "34654": "New Port Richey",
+    "34655": "New Port Richey",
+    "34667": "Hudson",
+    "34668": "Port Richey",
+    "34669": "Hudson",
+    "34690": "Holiday",
+    "34691": "Holiday",
+}
+
+
+def _pasco_reverse_geocode_city(session: requests.Session, cx: float, cy: float):
+    """Given a web-mercator centroid, return (city_name, zip5) from Census geocoder."""
+    import math
+    # Convert Web Mercator (EPSG:3857) to WGS84
+    lon = cx / 20037508.342 * 180.0
+    lat = math.degrees(2.0 * math.atan(math.exp(cy / 20037508.342 * math.pi)) - math.pi / 2.0)
+    try:
+        r = session.get(
+            "https://geocoding.geo.census.gov/geocoder/geographies/coordinates",
+            params={
+                "x": f"{lon:.6f}",
+                "y": f"{lat:.6f}",
+                "benchmark": "Public_AR_Census2020",
+                "vintage": "Census2020_Census2020",
+                "layers": "all",
+                "format": "json",
+            },
+            timeout=10,
+        )
+        geo = r.json().get("result", {}).get("geographies", {})
+        found_zip = ""
+        # Try ZIP code tabulation area first to capture zip
+        for zcta in geo.get("Zip Code Tabulation Areas", []):
+            z = str(zcta.get("BASENAME", "") or zcta.get("NAME", "")).strip().replace("ZCTA5 ", "")
+            if z.isdigit() and len(z) == 5:
+                found_zip = z
+                break
+        # Prefer incorporated place name
+        for place in geo.get("Incorporated Places", []):
+            name = str(place.get("NAME", "")).strip().title()
+            if name:
+                return name, found_zip
+        # Fall back to ZIP → city lookup
+        if found_zip:
+            city = _PASCO_ZIP_CITY.get(found_zip, "")
+            return city, found_zip
+    except Exception:
+        pass
+    return "", ""
+
+
+def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
+    """Fetch parcel data from Pasco County ArcGIS REST service, including zoning and FLUM."""
+    session = get_resilient_session()
+    url = "https://maps.pascopa.com/arcgis/rest/services/Parcels/MapServer/3/query"
+    pid = parcel_id.strip()
+    where = f"ParcelID='{pid.replace(chr(39), chr(39)+chr(39))}'"
+    try:
+        r = session.get(
+            url,
+            params={
+                "where": where,
+                "outFields": "NAD_NAME_1,NAD_NAME_2,PHYS_STREET,PHYS_CITY,PHYS_STATE,PHYS_ZIP,TR_AC,VAL_ACRES,DIR_CLASS",
+                "returnGeometry": "true",
+                "f": "json",
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+        d = r.json()
+        features = d.get("features", [])
+        if not features:
+            return {"success": False, "error": "Parcel not found in Pasco County records"}
+        feat = features[0]
+        a = feat.get("attributes", {})
+
+        owner_parts = [str(a.get("NAD_NAME_1") or "").strip(), str(a.get("NAD_NAME_2") or "").strip()]
+        owner = " ".join(p for p in owner_parts if p)
+
+        street = str(a.get("PHYS_STREET") or "").strip()
+        city = str(a.get("PHYS_CITY") or "").strip().title()
+        state_code = str(a.get("PHYS_STATE") or "FL").strip() or "FL"
+        zip_code = str(a.get("PHYS_ZIP") or "").strip()
+
+        # Compute centroid from geometry (needed for spatial lookups + city fallback)
+        rings = (feat.get("geometry") or {}).get("rings", [[]])
+        pts = rings[0] if rings else []
+        cx = cy = None
+        if pts:
+            cx = sum(p[0] for p in pts) / len(pts)
+            cy = sum(p[1] for p in pts) / len(pts)
+
+        # Vacant land often has no PHYS_CITY — use Census reverse geocoder to fill it
+        if (not city or not zip_code) and cx is not None:
+            geo_city, geo_zip = _pasco_reverse_geocode_city(session, cx, cy)
+            if not city:
+                city = geo_city
+            if not zip_code and geo_zip:
+                zip_code = geo_zip
+
+        # If still no city, fall back to unincorporated label
+        if not city:
+            city = "Unincorporated Pasco"
+
+        # Build site address — if no physical street, match PA website which shows "No Physical Address"
+        if street:
+            addr_loc = f"{state_code} {zip_code}".strip()
+            address_parts = [p for p in [street, city, addr_loc] if p]
+            address = ", ".join(address_parts)
+        else:
+            address = "No Physical Address"
+
+        acres_raw = a.get("TR_AC") if a.get("TR_AC") is not None else a.get("VAL_ACRES")
+        try:
+            acres = float(acres_raw or 0)
+            acres_str = f"{acres:.2f}" if acres else ""
+        except Exception:
+            acres_str = str(acres_raw or "")
+
+        dir_class = str(a.get("DIR_CLASS") or "").strip().zfill(3)
+        land_use = lookup_dor_use_code(dir_class)
+
+        # Spatial zoning + FLUM lookup using parcel centroid
+        spatial = {}
+        if cx is not None:
+            spatial = _pasco_spatial_lookup(session, cx, cy)
+
+        adj_uses = _pasco_adjacent_uses(session, pid, rings)
+
+        return {
+            "success": True,
+            "parcel_id": pid,
+            "owner": owner,
+            "address": address,
+            "city": city,
+            "zip": zip_code,
+            "land_use": land_use,
+            "site_area_sqft": "",
+            "site_area_acres": acres_str,
+            "adjoining_uses": adj_uses,
+            **spatial,
+        }
+    except Exception as exc:
+        return {"success": False, "error": f"Error querying Pasco ArcGIS: {str(exc)}"}

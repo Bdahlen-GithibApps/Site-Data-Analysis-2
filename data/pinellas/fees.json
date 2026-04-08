@@ -1,0 +1,55 @@
+{
+  "_sections": [
+    "application_fees",
+    "impact_fees",
+    "pre_app",
+    "perm_steps",
+    "local_permits",
+    "wmd",
+    "fdep",
+    "fdot",
+    "dedication",
+    "securities",
+    "coastal_dev_permit",
+    "entitlements",
+    "lot_line",
+    "staff_meetings",
+    "public_meetings"
+  ],
+  "_source": "Pinellas County FY25 Adopted User Fees Schedule",
+  "_url": "https://pinellascounty.openbook.questica.com/#/budget-book/c1a439a4-8762-4b4b-85e1-936b7e8937d9/e143da6e-25f1-4de7-ae7c-8c0d16102db1",
+  "_jurisdiction": "Pinellas County (Unincorporated)",
+  "_note": "Fees are from FY25 Adopted schedule. Verify current rates with Pinellas County Building Services (727-464-3888) or pinellascounty.org/build/",
+
+  "impact_fees": "Site Plan Review (Standard Non-Residential): $2,145.00 base + $70.00/1,000 sf above 5,000 sf\nSite Plan Review (Complex Non-Residential): $3,790.00 base + $130.00/1,000 sf above 5,000 sf\nSite Plan Review (Standard Residential): $2,145.00 base + $70.00/tract or lot\nSite Plan Review (Complex Residential): $3,790.00 base + $130.00/tract or lot\nDRS Standard Review (base): $70.00\nDRS Complex Review (base): $85.00\nDRS Scope/Completeness/Zoning Verification: $15.00\nResubmittal (each after 2nd): 50% of original submittal fee\nSub-Sheet Review (minor outstanding issues): $330.00",
+
+  "application_fees": "Right-of-Way Permit — Commercial Driveway: $345.00\nRight-of-Way Permit — Commercial Storm/Sanitary/Water Connection: $260.00 each\nRight-of-Way Permit — New Road Construction: $860.00 min (up to ½ mile)\nRight-of-Way Permit — Utility Construction (underground/overhead): $430.00\nRight-of-Way Permit — Miscellaneous use of ROW or Easement: $130.00\nSubdivision Plat DRS Review: $600.00 initial; $200.00 re-submittal\nPetition to Vacate — Public Right of Way or Easement: $940.00 each\nRelease of Property Interest: $940.00\nAfter-the-Fact Applications: 2× normal fee",
+
+  "dedication": "Contact Pinellas County DRS for project-specific dedication requirements.\nPetition to Vacate ROW/Easement: $940.00 | Release of Property Interest: $940.00",
+
+  "securities": "Contact Pinellas County DRS for landscape/utility improvement securities.\nUtility tap fees (infrastructure): Water Tap 2\" main: $1,800.00 | 4\": $1,870.00 | 6\": $2,020.00 | 8\": $2,130.00\nSewer Connection Fee (Single Family): $2,293.00 | Multi-Family per unit: $1,834.00 | Commercial: $10.98/gallon of flow",
+
+  "lot_line": "DRS Subdivision Plat Review: $600.00 (initial); $200.00 (re-submittal)\nPetition to Vacate — Public Right of Way: $940.00\nPetition to Vacate — Easement: $940.00\nRelease of Property Interest: $940.00",
+
+  "pre_app": "Site Plan Pre-Application Meeting (Early Assistance Development Meeting): Free\nSite Plan Pre-Application Meeting (credited toward application fee if site plan submitted within 6 months): $415.00\nAdditional Site Plan Meetings: $415.00 each",
+
+  "coastal_dev_permit": "Water & Navigation Permit — Private Dock (poles/lifts, no piling): $519.34\nWater & Navigation Permit — Private Dock (<250 sf new deck): $694.34\nWater & Navigation Permit — Private Dock (250–499 sf): $750.79\nWater & Navigation Permit — Private Dock (500–999 sf): $790.30\nWater & Navigation Permit — Private Dock (>1,000 sf): $846.75\nMangrove Trimming Permit (Multi-Family/Commercial): $450.00\nFlood Zone Location Review: $15.00 per permit\nFlood Zone Plan Review Additional: +25% of plan review",
+
+  "lot_line_adj_timing": "Plat review may run concurrently with site plan. DRS plat re-submittal: $200.00",
+
+  "entitlements": "Standard Site Plan (No Variances / Type 1 Path B): ±2–3 months\nSite Plan with Variances (requiring BCC or ZBA): ±3–6 months after DRC approval\nSubdivision Plat: typically concurrent with site plan process\nLand Use Change (0–5 acres): $2,050.00; 5–10 acres: $2,210.00; 10–15 acres: $2,990.00; 15+ acres: $3,140.00",
+
+  "perm_steps": "1. Early Assistance Development Meeting (free) or Pre-Application Meeting ($415, credited)\n2. Site Plan Application + DRS Review (building, zoning, environmental, engineering)\n3. DRC Meeting if required\n4. Site Plan Approval / Conditions of Approval\n5. Construction Drawings + Building Permit Application ($9.00/$1,000 commercial value)\n6. Building Inspections + Re-inspection Fee: $75.00 if required\n7. Certificate of Occupancy / Certificate of Completion\nNote: Tree Permit and Sign Permit submitted concurrent with Building Permit",
+
+  "local_permits": "Pinellas County Building Services: 727-464-3888 | pinellascounty.org/build/\nStandard Building Permit Review: ±4–8 weeks\nSite Plan Review (Standard): ±4–8 weeks | Complex: ±8–12 weeks\nAfter-Hours Inspection: $400.00\nExpedited Plan Review — Commercial (0–5,000 sf): $500.00; (>5,000 sf): +50% of plan review fee\nContract Community Board of Adjustment variance advisory: $90.00/staff hour",
+
+  "wmd": "Southwest Florida Water Management District (SWFWMD) | 1-800-423-1476\nExemption (small sites with no wetland/water impacts, <9,000 sf impervious, <5 acres): ±2–3 months\nEnvironmental Resource Permit (ERP) — New: ±4–6 months\nERP Minor Modification: ±3–5 months\nERP Major Modification: ±4–6 months\nSWFWMD permitting can run concurrently with local/City permitting",
+
+  "fdep": "Florida Dept of Environmental Protection (FDEP)\nNotice of Intent — General Permit for Water Main Extension: ±2 months\nNotification/Application — Domestic Wastewater Collection/Transmission: ±2 months\nCan run concurrently with local and SWFWMD permitting\nNPDES exemption may be required for stormwater discharge",
+
+  "fdot": "Florida Dept of Transportation (FDOT)\nDriveway Connection Permit required if project accesses a State road\nGenerally ±3–6 months; can run concurrent with local permitting\nContact FDOT District 7 (Tampa): 813-975-6000",
+
+  "staff_meetings": "Early Assistance Development Meeting (free) and/or Pre-Application Meeting ($415)\nDRC (Development Review Committee) meeting if triggered by project scope",
+
+  "public_meetings": "Neighborhood noticing required for variance/adjustment applications ($65–$220)\nBCC public hearing required for rezonings and land use amendments\nBoard of Adjustment variance hearing if applicable"
+}

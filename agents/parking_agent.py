@@ -1,146 +1,145 @@
 """
-Parking Agent — loads parking data and calculates required spaces.
+agents/parking_agent.py — Parking requirements calculation agent.
+
+Loads county-specific parking data from data/<county>/parking.json.
+Calculates required motor vehicle spaces, ADA accessible spaces, and bicycle spaces.
 """
+
 from __future__ import annotations
 
 import json
-import math
 import logging
+import math
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_DATA_ROOT = Path(__file__).parent.parent / "data"
+_ADA_PERCENTAGE = 0.02  # 2% of total spaces for lots > 500
 
 
 class ParkingAgent:
-    """
-    Loads county-specific parking data from JSON and provides calculation
-    methods for motor-vehicle spaces, ADA spaces, and bicycle spaces.
-    """
+    """Calculates parking requirements for a given county, use type, and building size."""
 
-    def __init__(self, county: str = "Pinellas") -> None:
-        self._county = county
-        data_dir = _DATA_ROOT / county.lower()
-        raw = self._load(data_dir / "parking.json")
-        self._requirements: dict = raw.get("requirements", {})
-        self._ada_table: list = raw.get("ada_table", [])
-        self._dimensions: dict = raw.get("dimensions", {})
-        self._bicycle: dict = raw.get("bicycle", {})
+    def __init__(self):
+        self._cache: Dict[str, Dict] = {}
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # Data loading
+    # ──────────────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _load(path: Path) -> dict:
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except FileNotFoundError:
-            logger.warning("Data file not found: %s", path)
-            return {}
-        except json.JSONDecodeError as exc:
-            logger.error("Failed to parse %s: %s", path, exc)
-            return {}
+    def _load(self, county: str) -> Dict:
+        if county not in self._cache:
+            path = Path(__file__).parent.parent / "data" / county.lower() / "parking.json"
+            if path.exists():
+                with path.open() as f:
+                    self._cache[county] = json.load(f)
+            else:
+                logger.warning("Parking data file not found for county: %s", county)
+                self._cache[county] = {}
+        return self._cache[county]
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # ADA calculation (per ADA / Florida Building Code)
+    # ──────────────────────────────────────────────────────────────────
 
-    @property
-    def use_types(self) -> list[str]:
-        """Sorted list of use types available in the parking table."""
-        return list(self._requirements.keys())
+    def get_ada_spaces(self, county: str, total_spaces: int) -> int:
+        """Calculate required ADA accessible spaces from total parking count."""
+        data = self._load(county)
+        ada_table = data.get("ada_parking_table", [])
 
-    @property
-    def dimensions(self) -> dict:
-        """Parking stall dimension configurations."""
-        return self._dimensions
+        for row in ada_table:
+            if row["total_spaces_min"] <= total_spaces <= row["total_spaces_max"]:
+                if "note" in row and "%" in row["note"]:
+                    return max(row["accessible_required"], math.ceil(total_spaces * _ADA_PERCENTAGE))
+                return row["accessible_required"]
+        # Over 1000 spaces: 2% rule (ceiling)
+        return math.ceil(total_spaces * _ADA_PERCENTAGE)
 
-    def get_parking_rate(self, use_type: str) -> Optional[dict]:
-        """Return the parking rate record for *use_type*, or ``None``."""
-        return self._requirements.get(use_type)
+    # ──────────────────────────────────────────────────────────────────
+    # Bicycle parking (Sec. 138-3603)
+    # ──────────────────────────────────────────────────────────────────
 
-    def calculate_spaces(
+    def get_bicycle_spaces(self, county: str, motor_vehicle_spaces: int) -> int:
+        """Calculate required bicycle spaces. Logic extracted from BICYCLE_PARKING lambda."""
+        data = self._load(county)
+        bp = data.get("bicycle_parking", {})
+        min_spaces = bp.get("min_spaces", 2)
+        per_mv = bp.get("spaces_per_motor_vehicle", 20)
+        return max(min_spaces, motor_vehicle_spaces // per_mv)
+
+    # ──────────────────────────────────────────────────────────────────
+    # Parking rate lookup
+    # ──────────────────────────────────────────────────────────────────
+
+    def get_parking_rate(self, county: str, use_type: str) -> Optional[Dict[str, Any]]:
+        """Return parking rate dict for a use type."""
+        data = self._load(county)
+        return data.get("parking_requirements", {}).get(use_type)
+
+    def get_use_type_options(self, county: str) -> Dict[str, str]:
+        """Return {use_type: use_type} dict for UI dropdowns."""
+        data = self._load(county)
+        return {k: k for k in data.get("parking_requirements", {}).keys()}
+
+    def get_dimensions(self, county: str) -> Dict[str, Any]:
+        """Return parking stall dimensions table."""
+        data = self._load(county)
+        return data.get("parking_dimensions", {})
+
+    # ──────────────────────────────────────────────────────────────────
+    # Main calculation
+    # ──────────────────────────────────────────────────────────────────
+
+    def calculate(
         self,
+        county: str,
         use_type: str,
         building_sf: float = 0.0,
         num_units: int = 0,
-    ) -> Optional[int]:
+    ) -> Dict[str, Any]:
         """
-        Calculate the minimum required motor-vehicle spaces.
+        Calculate parking requirements for a use type.
 
-        Parameters
-        ----------
-        use_type:
-            Key from the parking requirements table.
-        building_sf:
-            Gross floor area in square feet (used for sf-based rates).
-        num_units:
-            Number of dwelling units, seats, beds, etc.
-
-        Returns
-        -------
-        int or None
-            Calculated spaces, or ``None`` if data is insufficient.
+        Returns:
+            use_type, rate_description, required_spaces, max_spaces,
+            ada_spaces, bicycle_spaces, dimensions, error (if any)
         """
-        rate = self.get_parking_rate(use_type)
+        rate = self.get_parking_rate(county, use_type)
         if not rate:
-            return None
+            return {"error": f"Use type '{use_type}' not found in parking tables for {county}."}
 
         unit = rate.get("unit", "")
         min_per_unit = rate.get("min_per_unit")
+        calc_spaces = 0
+        max_spaces = None
 
-        if min_per_unit is None:
-            return None
+        if unit == "1,000 sf GFA" and building_sf > 0 and min_per_unit is not None:
+            calc_spaces = math.ceil(min_per_unit * (building_sf / 1000))
+            if rate.get("max_limit"):
+                try:
+                    max_rate = float(rate["max_limit"].split(" ")[0])
+                    max_spaces = math.ceil(max_rate * (building_sf / 1000))
+                except (ValueError, IndexError):
+                    pass
+        elif unit == "dwelling unit" and num_units > 0 and min_per_unit is not None:
+            calc_spaces = math.ceil(min_per_unit * num_units)
+        elif num_units > 0 and min_per_unit is not None:
+            calc_spaces = math.ceil(min_per_unit * num_units)
 
-        if unit == "1,000 sf GFA":
-            if building_sf <= 0:
-                return None
-            return math.ceil(min_per_unit * (building_sf / 1000))
-        elif unit == "dwelling unit":
-            if num_units <= 0:
-                return None
-            return math.ceil(min_per_unit * num_units)
-        else:
-            if num_units <= 0:
-                return None
-            return math.ceil(min_per_unit * num_units)
+        ada_spaces = self.get_ada_spaces(county, calc_spaces) if calc_spaces > 0 else 0
+        bicycle_spaces = self.get_bicycle_spaces(county, calc_spaces) if calc_spaces > 0 else 0
 
-    def get_max_spaces(
-        self,
-        use_type: str,
-        building_sf: float = 0.0,
-    ) -> Optional[int]:
-        """Return the maximum allowed spaces for sf-based uses, or ``None``."""
-        rate = self.get_parking_rate(use_type)
-        if not rate or not rate.get("max_limit"):
-            return None
-        try:
-            max_rate = float(str(rate["max_limit"]).split(" ")[0])
-            return math.ceil(max_rate * (building_sf / 1000))
-        except (ValueError, IndexError):
-            return None
-
-    def get_ada_spaces(self, total_spaces: int) -> int:
-        """Calculate required ADA accessible spaces from total parking count."""
-        for row in self._ada_table:
-            if row["total_spaces_min"] <= total_spaces <= row["total_spaces_max"]:
-                if "note" in row and "%" in row.get("note", ""):
-                    return max(row["accessible_required"], int(total_spaces * 0.02))
-                return row["accessible_required"]
-        # Over 1000
-        return int(total_spaces * 0.02)
-
-    def get_bicycle_spaces(self, motor_vehicle_spaces: int) -> int:
-        """
-        Calculate required bicycle spaces.
-
-        Rule: 1 bicycle space per ``spaces_per_mv_spaces`` motor-vehicle spaces,
-        minimum ``min_spaces``.
-        """
-        min_spaces = self._bicycle.get("min_spaces", 2)
-        ratio = self._bicycle.get("spaces_per_mv_spaces", 20)
-        return max(min_spaces, motor_vehicle_spaces // ratio)
+        return {
+            "use_type": use_type,
+            "rate_description": rate.get("min_rate", ""),
+            "max_limit_description": rate.get("max_limit"),
+            "unit": unit,
+            "required_spaces": calc_spaces,
+            "max_spaces": max_spaces,
+            "ada_spaces": ada_spaces,
+            "bicycle_spaces": bicycle_spaces,
+            "dimensions": self.get_dimensions(county),
+            "building_sf": building_sf,
+            "num_units": num_units,
+        }

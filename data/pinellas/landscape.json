@@ -1,106 +1,116 @@
 {
-  "_source": "Pinellas County Land Development Code, Chapter 138, Article IV — Landscape Standards",
-  "_note": "Data is a structured summary for reference. Verify against current code before use.",
-
+  "code_reference": "Ch. 138, Art. IV — Landscaping & Tree Protection (Pinellas County Land Development Code)",
   "perimeter_buffers": {
-    "_description": "Required landscape buffer widths (feet) based on adjacent land use/zoning. Sec. 138-4503.",
-    "residential_to_residential": {
-      "min_width_ft": 5,
-      "notes": "Type A buffer: 1 tree per 25 lf, 1 shrub per 3 lf"
+    "_description": "Buffer type required depends on the zoning of the subject property and the adjacent land use. Type A is least intensive, Type C is most intensive.",
+    "buffer_types": {
+      "type_A": {
+        "label": "Type A Buffer",
+        "min_width_ft": 5,
+        "trees_per_100ft": 1,
+        "shrub_hedge_required": true,
+        "berm_or_wall_required": false,
+        "notes": "Minimum 5-foot wide planting strip with 1 canopy or understory tree per 100 linear feet and a continuous shrub hedge."
+      },
+      "type_B": {
+        "label": "Type B Buffer",
+        "min_width_ft": 10,
+        "trees_per_100ft": 2,
+        "shrub_hedge_required": true,
+        "berm_or_wall_required": false,
+        "notes": "Minimum 10-foot wide planting strip with 2 canopy trees per 100 linear feet and a continuous shrub hedge."
+      },
+      "type_C": {
+        "label": "Type C Buffer",
+        "min_width_ft": 15,
+        "trees_per_100ft": 3,
+        "shrub_hedge_required": true,
+        "berm_or_wall_required": true,
+        "notes": "Minimum 15-foot wide planting strip with 3 canopy trees per 100 linear feet, continuous shrub hedge, and opaque wall or berm."
+      }
     },
-    "nonresidential_to_residential": {
-      "min_width_ft": 10,
-      "notes": "Type B buffer: 1 tree per 25 lf, 2 shrubs per 3 lf, 6-ft opaque screen"
-    },
-    "industrial_to_residential": {
-      "min_width_ft": 15,
-      "notes": "Type C buffer: 1 tree per 25 lf, 3 shrubs per 3 lf, 6-ft opaque screen"
-    },
-    "nonresidential_to_nonresidential": {
-      "min_width_ft": 5,
-      "notes": "Type A buffer"
-    },
-    "along_roadway_local": {
-      "min_width_ft": 5,
-      "notes": "1 tree per 35 lf of frontage"
-    },
-    "along_roadway_collector": {
-      "min_width_ft": 10,
-      "notes": "1 tree per 35 lf of frontage"
-    },
-    "along_roadway_arterial": {
-      "min_width_ft": 15,
-      "notes": "1 tree per 35 lf of frontage"
+    "adjacency_matrix": {
+      "_description": "Required buffer type based on subject zoning category vs adjacent land use category.",
+      "residential_adjacent_to_commercial_or_industrial": "type_C",
+      "residential_adjacent_to_residential": "type_A",
+      "commercial_adjacent_to_residential": "type_C",
+      "commercial_adjacent_to_commercial": "type_A",
+      "commercial_adjacent_to_industrial": "type_B",
+      "industrial_adjacent_to_residential": "type_C",
+      "industrial_adjacent_to_commercial": "type_B",
+      "industrial_adjacent_to_industrial": "type_A",
+      "default": "type_A"
     }
   },
-
   "parking_lot_landscaping": {
-    "_description": "Interior parking lot landscaping requirements. Sec. 138-4505.",
+    "code_reference": "Sec. 138-3800 — Landscape Requirements for Parking Areas",
     "interior_islands": {
-      "min_island_width_ft": 8,
-      "min_island_area_sf": 100,
+      "rule": "1 landscape island per 10 contiguous parking spaces",
+      "min_island_area_sf": 150,
+      "min_island_width_ft": 9,
       "trees_per_island": 1,
-      "required_every_n_spaces": 10,
-      "notes": "One terminal island at end of each row; one interior island per 10 continuous spaces"
+      "notes": "Each interior island must contain at least one canopy tree and groundcover or shrubs."
     },
     "perimeter_strip": {
       "min_width_ft": 5,
-      "trees_per_lf": 0.029,
-      "notes": "1 tree per 35 lf of perimeter"
+      "rule": "5-foot landscape strip required along all parking lot perimeters abutting a right-of-way or adjacent property",
+      "shrub_hedge_required": true
     },
-    "shade_requirement": {
-      "target_canopy_coverage_pct": 50,
-      "at_year": 10,
-      "notes": "50% canopy coverage of parking area at 10-year maturity"
+    "canopy_trees": {
+      "rule": "Minimum 1 canopy tree per 10 parking spaces",
+      "notes": "Trees may be located in interior islands or perimeter strips."
     }
   },
-
-  "tree_requirements": {
-    "_description": "Tree preservation and replacement requirements. Sec. 138-4507.",
-    "minimum_tree_size": {
-      "dbh_inches": 2,
-      "height_ft": 6,
-      "notes": "Minimum size for newly planted trees"
+  "tree_canopy": {
+    "code_reference": "Sec. 138-3801 — Tree Canopy & Preservation Requirements",
+    "residential": {
+      "min_canopy_coverage_pct": 25,
+      "target_years": 15,
+      "notes": "25% canopy coverage measured at 15 years post-installation."
     },
-    "heritage_tree_threshold_dbh_inches": 18,
-    "protected_tree_threshold_dbh_inches": 8,
-    "replacement_ratio": {
-      "protected": "1:1 (1 replacement per 1 removed)",
-      "heritage": "2:1 (2 replacements per 1 removed)"
+    "commercial": {
+      "min_canopy_coverage_pct": 15,
+      "target_years": 15,
+      "notes": "15% canopy coverage measured at 15 years post-installation."
     },
-    "preferred_native_species": [
-      "Live Oak (Quercus virginiana)",
-      "Slash Pine (Pinus elliottii)",
-      "Cabbage Palm (Sabal palmetto)",
-      "Southern Magnolia (Magnolia grandiflora)",
-      "Bald Cypress (Taxodium distichum)",
-      "Red Maple (Acer rubrum)",
-      "Sweetgum (Liquidambar styraciflua)"
-    ],
-    "prohibited_species": [
-      "Melaleuca (Melaleuca quinquenervia)",
-      "Brazilian Pepper (Schinus terebinthifolia)",
-      "Australian Pine (Casuarina spp.)",
-      "Punk Tree",
-      "Carrotwood (Cupaniopsis anacardioides)"
-    ]
+    "industrial": {
+      "min_canopy_coverage_pct": 10,
+      "target_years": 15,
+      "notes": "10% canopy coverage measured at 15 years post-installation."
+    },
+    "heritage_trees": {
+      "min_dbh_inches": 24,
+      "description": "Heritage trees (24 inches DBH or greater) are protected and require mitigation if removed.",
+      "mitigation": "Replacement trees or payment into the County's tree bank fund at the rate specified in Sec. 138-3801."
+    },
+    "specimen_trees": {
+      "min_dbh_inches": 18,
+      "description": "Specimen trees (18 inches DBH or greater) require a tree removal permit.",
+      "replacement_ratio": "2:1 caliper-inch replacement or equivalent mitigation"
+    }
   },
-
   "irrigation": {
-    "_description": "Irrigation system requirements for new landscape areas. Sec. 138-4509.",
-    "required_for_new_development": true,
-    "drought_tolerant_exemption": "Areas planted exclusively with drought-tolerant or native species may be exempt after establishment period",
-    "reclaimed_water": "Required where reclaimed water is available within 500 feet",
-    "rain_sensor": "Automatic rain shutoff sensor required on all irrigation systems",
-    "establishment_period_days": 180
+    "code_reference": "Sec. 138-3802 — Irrigation Requirements",
+    "required": true,
+    "type": "Automatic underground irrigation system",
+    "notes": "All required landscape areas shall be served by an automatic underground irrigation system with rain sensor/shutoff device per Florida Statutes.",
+    "drought_tolerant_exemption": "100% Florida-Friendly or xeriscape plantings may be exempt from irrigation requirements per Ch. 138."
   },
-
-  "stormwater_landscaping": {
-    "_description": "Landscape requirements in stormwater facilities. Sec. 138-4511.",
-    "littoral_zone": {
-      "required": true,
-      "min_pct_of_shoreline": 30,
-      "notes": "30% of pond shoreline must have littoral (aquatic) plantings"
-    }
+  "sight_triangles": {
+    "code_reference": "Sec. 138-3803 — Visibility Triangles",
+    "intersection_sight_triangle_ft": 20,
+    "driveway_sight_triangle_ft": 10,
+    "max_height_in_triangle_ft": 3,
+    "notes": "No plant material between 3 and 8 feet in height is permitted within the sight triangle at intersections and driveway aprons."
+  },
+  "plant_materials": {
+    "code_reference": "Sec. 138-3804 — Plant Material Standards",
+    "canopy_tree_min_height_ft": 10,
+    "canopy_tree_min_caliper_in": 2,
+    "understory_tree_min_height_ft": 6,
+    "shrub_min_height_in": 18,
+    "groundcover_spacing_in": 18,
+    "florida_friendly_pct": 75,
+    "invasive_species_prohibited": true,
+    "notes": "At least 75% of required plant material shall be Florida-Friendly species. Invasive species as listed by FDEP/IFAS are prohibited."
   }
 }

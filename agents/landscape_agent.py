@@ -1,79 +1,143 @@
 """
-Landscape Agent — loads and exposes landscape code requirements for a county.
+agents/landscape_agent.py — Landscape buffer, tree canopy, and irrigation requirements agent.
+
+Loads county-specific landscape code data from data/<county>/landscape.json.
+Based on Pinellas County Ch. 138, Art. IV — Landscaping & Tree Protection.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
-
-_DATA_ROOT = Path(__file__).parent.parent / "data"
 
 
 class LandscapeAgent:
     """
-    Loads county-specific landscape data from JSON and provides query methods
-    for perimeter buffers, parking lot landscaping, and tree requirements.
+    Returns landscape requirements including:
+    - Perimeter buffer types (A/B/C) based on zoning adjacency
+    - Parking lot landscaping standards
+    - Tree canopy coverage requirements
+    - Irrigation requirements
+    - Sight triangle standards
+    - Plant material standards
     """
 
-    def __init__(self, county: str = "Pinellas") -> None:
-        self._county = county
-        data_dir = _DATA_ROOT / county.lower()
-        self._data: dict = self._load(data_dir / "landscape.json")
+    def __init__(self):
+        self._cache: Dict[str, Dict] = {}
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
+    # Data loading
+    # ──────────────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _load(path: Path) -> dict:
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except FileNotFoundError:
-            logger.warning("Landscape data file not found: %s", path)
-            return {}
-        except json.JSONDecodeError as exc:
-            logger.error("Failed to parse %s: %s", path, exc)
-            return {}
+    def _load(self, county: str) -> Dict:
+        if county not in self._cache:
+            path = Path(__file__).parent.parent / "data" / county.lower() / "landscape.json"
+            if path.exists():
+                with path.open() as f:
+                    self._cache[county] = json.load(f)
+            else:
+                logger.warning("Landscape data file not found for county: %s", county)
+                self._cache[county] = {}
+        return self._cache[county]
 
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
     # Public API
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────
 
-    def get_perimeter_buffer(self, adjacency_type: str) -> Optional[dict]:
+    def get_buffer_type(self, county: str, adjacency_key: str) -> Optional[Dict[str, Any]]:
         """
-        Return buffer requirements for a given adjacency scenario.
+        Return the buffer type definition for a given adjacency scenario.
 
-        Parameters
-        ----------
-        adjacency_type:
-            One of the keys in the ``perimeter_buffers`` section of the data,
-            e.g. ``"nonresidential_to_residential"``.
+        adjacency_key examples:
+            'residential_adjacent_to_commercial_or_industrial'
+            'commercial_adjacent_to_residential'
         """
-        buffers = self._data.get("perimeter_buffers", {})
-        return buffers.get(adjacency_type)
+        data = self._load(county)
+        buffers = data.get("perimeter_buffers", {})
+        adjacency = buffers.get("adjacency_matrix", {})
+        buffer_types = buffers.get("buffer_types", {})
 
-    def get_parking_lot_requirements(self) -> dict:
-        """Return interior parking lot landscaping requirements."""
-        return self._data.get("parking_lot_landscaping", {})
+        type_key = adjacency.get(adjacency_key) or adjacency.get("default", "type_A")
+        return buffer_types.get(type_key)
 
-    def get_tree_requirements(self) -> dict:
-        """Return tree preservation and replacement requirements."""
-        return self._data.get("tree_requirements", {})
+    def get_parking_lot_requirements(self, county: str) -> Dict[str, Any]:
+        """Return parking lot landscaping standards."""
+        data = self._load(county)
+        return data.get("parking_lot_landscaping", {})
 
-    def get_irrigation_requirements(self) -> dict:
-        """Return irrigation system requirements."""
-        return self._data.get("irrigation", {})
+    def get_tree_canopy_requirements(self, county: str, use_category: str = "commercial") -> Dict[str, Any]:
+        """
+        Return tree canopy requirements for a use category.
 
-    def get_stormwater_requirements(self) -> dict:
-        """Return stormwater / littoral zone landscaping requirements."""
-        return self._data.get("stormwater_landscaping", {})
+        use_category: 'residential', 'commercial', or 'industrial'
+        """
+        data = self._load(county)
+        canopy = data.get("tree_canopy", {})
+        return canopy.get(use_category, canopy.get("commercial", {}))
 
-    @property
-    def all_data(self) -> dict:
-        """Full raw landscape data dict."""
-        return self._data
+    def get_requirements(
+        self,
+        county: str,
+        zoning_code: Optional[str] = None,
+        site_area_sf: Optional[float] = None,
+        adjacency_scenario: Optional[str] = None,
+        use_category: str = "commercial",
+    ) -> Dict[str, Any]:
+        """
+        Return full landscape requirements for a site.
+
+        Args:
+            county: County name (e.g. 'Pinellas')
+            zoning_code: Optional zoning district code for context
+            site_area_sf: Optional site area in square feet for calculations
+            adjacency_scenario: Optional adjacency key for buffer lookup
+            use_category: 'residential', 'commercial', or 'industrial'
+
+        Returns:
+            Dict with available, county, buffer_types, parking_lot,
+            tree_canopy, irrigation, sight_triangles, plant_materials
+        """
+        data = self._load(county)
+        if not data:
+            return {
+                "available": False,
+                "message": f"Landscape code data not yet available for {county}.",
+            }
+
+        result: Dict[str, Any] = {
+            "available": True,
+            "county": county,
+            "code_reference": data.get("code_reference", ""),
+        }
+
+        # Perimeter buffers — all buffer type definitions
+        buffers = data.get("perimeter_buffers", {})
+        result["buffer_types"] = buffers.get("buffer_types", {})
+        result["adjacency_matrix"] = buffers.get("adjacency_matrix", {})
+
+        # Specific buffer for adjacency scenario
+        if adjacency_scenario:
+            result["applicable_buffer"] = self.get_buffer_type(county, adjacency_scenario)
+
+        # Parking lot landscaping
+        result["parking_lot"] = data.get("parking_lot_landscaping", {})
+
+        # Tree canopy
+        result["tree_canopy"] = self.get_tree_canopy_requirements(county, use_category)
+        result["tree_canopy_heritage"] = data.get("tree_canopy", {}).get("heritage_trees", {})
+        result["tree_canopy_specimen"] = data.get("tree_canopy", {}).get("specimen_trees", {})
+
+        # Irrigation
+        result["irrigation"] = data.get("irrigation", {})
+
+        # Sight triangles
+        result["sight_triangles"] = data.get("sight_triangles", {})
+
+        # Plant material standards
+        result["plant_materials"] = data.get("plant_materials", {})
+
+        return result

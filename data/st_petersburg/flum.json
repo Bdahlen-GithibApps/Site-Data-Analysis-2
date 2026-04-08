@@ -1,0 +1,113 @@
+{
+  "_source": "City of St. Petersburg Comprehensive Plan — Future Land Use Element. Verify current adopted densities/intensities at stpete.org/compplan",
+
+  "CBD": {
+    "name": "Central Business District",
+    "description": "Downtown St. Petersburg core; highest-intensity urban mixed use",
+    "max_density_du_per_acre": null,
+    "max_far": 10.0,
+    "max_isratio": null,
+    "compatible_zoning": ["DC-1", "DC-2"],
+    "notes": "No residential density cap in CBD — governed by FAR and design standards. FAR up to 10.0 base; bonuses available. Full range of downtown uses permitted."
+  },
+
+  "RMU": {
+    "name": "Regional Mixed Use",
+    "description": "High-intensity mixed-use nodes serving regional market; corridors and activity centers outside downtown",
+    "max_density_du_per_acre": 100,
+    "max_far": 6.0,
+    "max_isratio": null,
+    "compatible_zoning": ["CMX-3", "DC-3"],
+    "notes": "Intended for regional commercial nodes, transit corridors, and urban centers outside downtown. Mixed residential and commercial at high intensity."
+  },
+
+  "CMU": {
+    "name": "Community Mixed Use",
+    "description": "Community-scale commercial corridors and mixed-use activity centers",
+    "max_density_du_per_acre": 35,
+    "max_far": 3.0,
+    "max_isratio": null,
+    "compatible_zoning": ["CMX-1", "CMX-2", "NMX", "NE"],
+    "notes": "Mid-intensity mixed use. Ground-floor active uses encouraged. Serves community commercial needs along primary corridors."
+  },
+
+  "RFH": {
+    "name": "Residential Future High",
+    "description": "High-density residential — multi-family, apartments, condos",
+    "max_density_du_per_acre": 100,
+    "max_far": 3.0,
+    "max_isratio": null,
+    "compatible_zoning": ["NT-3", "NE", "NMX"],
+    "notes": "High-density residential areas. Typically located near transit and urban corridors. Confirm currently adopted density cap with City Comprehensive Plan."
+  },
+
+  "RFM": {
+    "name": "Residential Future Medium",
+    "description": "Medium-density residential — duplexes, triplexes, small apartment buildings",
+    "max_density_du_per_acre": 30,
+    "max_far": 1.5,
+    "max_isratio": null,
+    "compatible_zoning": ["NT-2", "NT-3", "NE"],
+    "notes": "Moderate residential density. Intended for small multi-family and attached single-family housing types in established neighborhoods."
+  },
+
+  "RFL": {
+    "name": "Residential Future Low",
+    "description": "Low-density single-family residential neighborhoods",
+    "max_density_du_per_acre": 7.5,
+    "max_far": 0.5,
+    "max_isratio": null,
+    "compatible_zoning": ["NT-1", "NT-2"],
+    "notes": "Preserves traditional single-family neighborhoods. Typical for established low-density residential areas of St. Pete."
+  },
+
+  "RFR": {
+    "name": "Residential Future Rural",
+    "description": "Very low-density rural and estate residential",
+    "max_density_du_per_acre": 1,
+    "max_far": 0.3,
+    "max_isratio": null,
+    "compatible_zoning": ["NT-1"],
+    "notes": "Low-intensity rural residential on large lots. Limited to areas with rural character, typically with acreage."
+  },
+
+  "EMP": {
+    "name": "Employment",
+    "description": "Employment-generating uses: office, light industrial, business park, R&D",
+    "max_density_du_per_acre": null,
+    "max_far": 1.5,
+    "max_isratio": null,
+    "compatible_zoning": ["BP", "IL"],
+    "notes": "Non-residential employment land. Residential uses generally not permitted. Focuses on job creation and business activity."
+  },
+
+  "IND": {
+    "name": "Industrial",
+    "description": "Heavy and general industrial uses; warehousing, manufacturing, distribution",
+    "max_density_du_per_acre": null,
+    "max_far": 2.0,
+    "max_isratio": null,
+    "compatible_zoning": ["IL", "IG"],
+    "notes": "Industrial land uses. Residential uses not permitted. Buffering from residential required. Confirm current adopted standards with City planning."
+  },
+
+  "PQP": {
+    "name": "Public / Quasi-Public",
+    "description": "Government, civic, institutional, educational, and utility facilities",
+    "max_density_du_per_acre": null,
+    "max_far": 1.5,
+    "max_isratio": null,
+    "compatible_zoning": ["P"],
+    "notes": "Public and institutional lands. FAR and use subject to specific use approval. Includes schools, hospitals, government offices, utilities."
+  },
+
+  "PSP": {
+    "name": "Parks, Shores and Preserve",
+    "description": "Parks, open space, waterfront shoreline, and conservation areas",
+    "max_density_du_per_acre": 0,
+    "max_far": 0.0,
+    "max_isratio": null,
+    "compatible_zoning": ["P"],
+    "notes": "No residential development. Minimal impervious surface. Preservation of natural, parks, and waterfront resources."
+  }
+}
