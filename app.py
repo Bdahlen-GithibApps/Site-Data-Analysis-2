@@ -1660,9 +1660,10 @@ with ui.tab_panels(tabs, value=tab1).classes("w-full"):
         with ui.card().classes("w-full tab-card"):
             render_tab_parking()
 
-ui.run(
-    title="Dev Code Lookup",
-    port=8080,
-    reload=True,
-    show=True,
-)
+if __name__ == "__main__":
+    ui.run(
+        title="Dev Code Lookup",
+        port=8080,
+        reload=False,
+        show=True,
+    )
