@@ -96,6 +96,8 @@ state: Dict[str, Any] = {
     "future_land_use": "",
     # Parking inputs — list of {use_type, building_sf, num_units} dicts
     "parking_uses": [],
+    # Proposed Development inputs — list of {use_type, quantity} dicts
+    "dev_uses": [],
     # Legacy single-use keys kept for backward compat
     "use_type": "",
     "building_sf": "",
@@ -306,9 +308,11 @@ def build_parking_markdown() -> str:
 
     lines: List[str] = []
     total_required = 0
+    total_max = 0
     total_ada = 0
     total_bicycle = 0
     any_error = False
+    use_results: List[Dict[str, Any]] = []
 
     for row in uses:
         use_type = row.get("use_type", "")
@@ -345,39 +349,89 @@ def build_parking_markdown() -> str:
         elif num_units > 0:
             lines.append(f"Units ({unit}): **{num_units}**")
 
-        lines.append(f"Required: **{calc_spaces}** spaces &nbsp;|&nbsp; ADA: {result['ada_spaces']} &nbsp;|&nbsp; Bicycle: {result['bicycle_spaces']}")
+        lines.append(f"Required: **{calc_spaces}** spaces")
         if result.get("max_spaces"):
             lines.append(f"Maximum allowed: {result['max_spaces']}")
         lines.append("")
 
         total_required += calc_spaces
+        total_max += result.get("max_spaces") or 0
         total_ada += result.get("ada_spaces", 0)
         total_bicycle += result.get("bicycle_spaces", 0)
+        use_results.append(result)
 
-    if len([r for r in uses if r.get("use_type")]) > 1 and total_required > 0:
+    # ── Summary Table ──
+    if total_required > 0:
         lines.append("---")
-        lines.append("### Totals")
+        lines.append("### Parking Summary")
         lines.append("")
         lines.append("| Requirement | Spaces |")
         lines.append("|-------------|--------|")
-        lines.append(f"| **Total Required Minimum** | **{total_required}** |")
-        lines.append(f"| ADA Accessible (total) | {total_ada} |")
-        lines.append(f"| Bicycle (total) | {total_bicycle} |")
+        lines.append(f"| **Motor Vehicle — Minimum Required** | **{total_required}** |")
+        if total_max > 0:
+            lines.append(f"| Motor Vehicle — Maximum Allowed | {total_max} |")
+        lines.append(f"| ADA Accessible | {total_ada} |")
+        lines.append(f"| Bicycle Parking | {total_bicycle} |")
         lines.append("")
 
+    # ── ADA Parking ──
+    if total_ada > 0:
+        lines.append("---")
+        lines.append("### ADA Accessible Parking")
+        lines.append("")
+        lines.append(f"Based on **{total_required}** total motor vehicle spaces, **{total_ada}** ADA accessible space(s) are required.")
+        lines.append("")
+
+    # ── Bicycle Parking ──
     if total_required > 0:
-        lines.append("**Stall Dimensions (Table 138-3602.d):**")
+        bp_data = _parking_agent._load(county).get("bicycle_parking", {})
+        bp_rule = bp_data.get("general_rule", "1 bicycle space per 20 motor vehicle spaces, minimum 2")
+        lines.append("---")
+        lines.append("### Bicycle Parking")
+        lines.append("")
+        lines.append(f"**Rule:** {bp_rule}")
+        lines.append("")
+        lines.append(f"Based on **{total_required}** motor vehicle spaces → **{total_bicycle}** bicycle space(s) required.")
+        lines.append("")
+
+    # ── Stall Dimensions (from county data) ──
+    if total_required > 0:
+        dims = _parking_agent.get_dimensions(county)
+        lines.append("---")
+        lines.append("### Stall Dimensions")
         lines.append("")
         lines.append("| Layout | Stall | Aisle |")
         lines.append("|--------|-------|-------|")
-        lines.append("| 90° | 9' × 18' | 24' (two-way) |")
-        lines.append("| 60° | 9' × 18' | 18' (one-way) |")
-        lines.append("| 45° | 9' × 18' | 15' (one-way) |")
-        lines.append("| Parallel | 8' × 22' | 12' (one-way) |")
-        lines.append("| ADA | 12' × 18' | — |")
+        if dims:
+            d90 = dims.get("90_degree", {})
+            d60 = dims.get("60_degree", {})
+            d45 = dims.get("45_degree", {})
+            dpar = dims.get("parallel", {})
+            dada = dims.get("accessible", {})
+            if d90:
+                lines.append(f"| 90° | {d90.get('stall_width', 9)}' × {d90.get('stall_depth', 18)}' | {d90.get('aisle_width_two_way', 24)}' (two-way) / {d90.get('aisle_width_one_way', 24)}' (one-way) |")
+            if d60:
+                lines.append(f"| 60° | {d60.get('stall_width', 9)}' × {d60.get('stall_depth', 18)}' | {d60.get('aisle_width_one_way', 18)}' (one-way) |")
+            if d45:
+                lines.append(f"| 45° | {d45.get('stall_width', 9)}' × {d45.get('stall_depth', 18)}' | {d45.get('aisle_width_one_way', 15)}' (one-way) |")
+            if dpar:
+                lines.append(f"| Parallel | {dpar.get('stall_width', 8)}' × {dpar.get('stall_depth', 22)}' | {dpar.get('aisle_width_one_way', 12)}' (one-way) |")
+            if dada:
+                lines.append(f"| ADA | {dada.get('stall_width', 12)}' × {dada.get('stall_depth', 18)}' | — |")
+        else:
+            lines.append("| 90° | 9' × 18' | 24' (two-way) |")
+            lines.append("| 60° | 9' × 18' | 18' (one-way) |")
+            lines.append("| 45° | 9' × 18' | 15' (one-way) |")
+            lines.append("| Parallel | 8' × 22' | 12' (one-way) |")
+            lines.append("| ADA | 12' × 18' | — |")
         lines.append("")
+
+        # Code references — county-specific
         lines.append("---")
-        lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
+        if county == "Pasco":
+            lines.append("**Code References:** LDC Sec. 500.3 — Off-Street Parking and Loading Requirements")
+        else:
+            lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
 
     return "\n".join(lines)
 
@@ -820,24 +874,160 @@ def render_tab_lookup() -> None:
 
 
             with ui.card().classes("section-card q-mt-md w-full"):
-                def run_analysis() -> None:
-                    # Read directly from UI elements in case state wasn't updated via change events
-                    zoning = state.get("zoning") or (ui_refs["zoning_select"].value if "zoning_select" in ui_refs else "")
-                    flu = state.get("future_land_use") or (ui_refs["flu_select"].value if "flu_select" in ui_refs else "")
-                    if not zoning and not flu:
-                        ui.notify("Set Zoning District and/or Future Land Use first.", type="warning")
-                        return
-                    # Sync to state
-                    if zoning:
-                        state["zoning"] = zoning
-                    if flu:
-                        state["future_land_use"] = flu
-                    refresh_all()
-                    tabs.set_value(tab2)
-                    ui.notify("Analysis complete — see Requirements, Parking, and Landscape tabs.", type="positive")
-
-                ui.button("RUN CODE ANALYSIS", on_click=run_analysis, color="primary").classes("w-full")
+                # run_analysis defined below after _sync_dev_to_parking is available
+                analysis_btn = ui.button("RUN CODE ANALYSIS", color="primary").classes("w-full")
                 ui.label("Pulls all zoning, FLU, parking, and landscape requirements from code.").classes("muted q-mt-xs")
+
+            # ── Proposed Development ──
+            with ui.card().classes("section-card q-mt-md w-full"):
+                ui.label("Proposed Development").classes("section-title")
+                ui.label(
+                    "Add each proposed use and its size. Parking, ADA, and bicycle requirements "
+                    "will auto-calculate on the Parking tab."
+                ).classes("muted q-mb-sm")
+
+                county_for_opts = state.get("county", "Pinellas")
+                dev_use_options = _parking_agent.get_use_type_options(county_for_opts)
+                dev_rows_container = ui.column().classes("w-full gap-2")
+                ui_refs["_dev_rows_container"] = dev_rows_container
+
+                def _get_unit_label(use_type: str) -> str:
+                    """Return a contextual input label based on what the parking rate needs."""
+                    rate = _parking_agent.get_parking_rate(state.get("county", "Pinellas"), use_type)
+                    if not rate:
+                        return "Quantity"
+                    unit = rate.get("unit", "")
+                    if unit == "1,000 sf GFA":
+                        return "Building SF (GFA)"
+                    if unit == "dwelling unit":
+                        return "Number of Units"
+                    if unit == "bed":
+                        return "Number of Beds"
+                    if unit == "guest room":
+                        return "Number of Rooms"
+                    if unit == "seat":
+                        return "Number of Seats"
+                    if unit == "classroom":
+                        return "Number of Classrooms"
+                    if unit == "wet slip":
+                        return "Number of Slips"
+                    if unit == "hole":
+                        return "Number of Holes"
+                    return f"Number of {unit}s"
+
+                def _get_placeholder(use_type: str) -> str:
+                    rate = _parking_agent.get_parking_rate(state.get("county", "Pinellas"), use_type)
+                    if not rate:
+                        return ""
+                    unit = rate.get("unit", "")
+                    if unit == "1,000 sf GFA":
+                        return "e.g. 15000"
+                    if unit == "dwelling unit":
+                        return "e.g. 120"
+                    return "e.g. 24"
+
+                def _is_sf_unit(use_type: str) -> bool:
+                    rate = _parking_agent.get_parking_rate(state.get("county", "Pinellas"), use_type)
+                    if not rate:
+                        return False
+                    return rate.get("unit", "") == "1,000 sf GFA"
+
+                def _sync_dev_to_parking() -> None:
+                    """Sync proposed development rows into parking_uses state and refresh parking."""
+                    dev_uses = state.get("dev_uses", [])
+                    parking_uses = []
+                    for row in dev_uses:
+                        use_type = row.get("use_type", "")
+                        if not use_type:
+                            continue
+                        quantity = row.get("quantity", "")
+                        if _is_sf_unit(use_type):
+                            parking_uses.append({"use_type": use_type, "building_sf": quantity, "num_units": ""})
+                        else:
+                            parking_uses.append({"use_type": use_type, "building_sf": "", "num_units": quantity})
+                    state["parking_uses"] = parking_uses
+                    refresh_parking()
+                    # Also re-render parking tab rows if they exist
+                    if "_parking_render_fn" in ui_refs:
+                        ui_refs["_parking_render_fn"]()
+
+                def _render_dev_rows() -> None:
+                    dev_rows_container.clear()
+                    dev_uses = state.get("dev_uses", [])
+                    with dev_rows_container:
+                        for idx, row in enumerate(dev_uses):
+                            use_type = row.get("use_type", "")
+                            qty_label = _get_unit_label(use_type) if use_type else "Quantity"
+                            qty_placeholder = _get_placeholder(use_type) if use_type else ""
+                            with ui.row().classes("w-full items-end no-wrap gap-2"):
+                                with ui.column().classes("col-5"):
+                                    ui.label("Use Type").classes("text-caption text-grey-7")
+                                    sel = ui.select(
+                                        dev_use_options,
+                                        value=row.get("use_type") or None,
+                                        with_input=True,
+                                    ).classes("w-full")
+                                    captured_idx = idx
+
+                                    def _on_dev_use_change(e, i=captured_idx) -> None:
+                                        state["dev_uses"][i]["use_type"] = e.value or ""
+                                        state["dev_uses"][i]["quantity"] = ""  # reset qty on use change
+                                        _render_dev_rows()
+                                        _sync_dev_to_parking()
+
+                                    sel.on("change", _on_dev_use_change)
+
+                                with ui.column().classes("col-5"):
+                                    ui.label(qty_label).classes("text-caption text-grey-7")
+                                    qty_inp = ui.input(
+                                        placeholder=qty_placeholder,
+                                        value=row.get("quantity", ""),
+                                    ).classes("w-full")
+
+                                    def _on_qty_change(e, i=captured_idx) -> None:
+                                        state["dev_uses"][i]["quantity"] = e.value or ""
+                                        _sync_dev_to_parking()
+
+                                    qty_inp.on("change", _on_qty_change)
+                                    qty_inp.on("keydown.enter", _on_qty_change)
+
+                                with ui.column().classes("col-2 items-center"):
+                                    ui.label("").classes("text-caption")
+                                    def _remove_dev_row(i=captured_idx) -> None:
+                                        state["dev_uses"].pop(i)
+                                        _render_dev_rows()
+                                        _sync_dev_to_parking()
+
+                                    ui.button(icon="delete", on_click=_remove_dev_row).props("flat round dense color=negative")
+
+                def _add_dev_row() -> None:
+                    state.setdefault("dev_uses", []).append({"use_type": "", "quantity": ""})
+                    _render_dev_rows()
+
+                if not state.get("dev_uses"):
+                    state["dev_uses"] = [{"use_type": "", "quantity": ""}]
+                _render_dev_rows()
+
+                ui.button("+ ADD USE", on_click=_add_dev_row, icon="add").props("outline").classes("q-mt-sm")
+
+            # Now wire up the RUN CODE ANALYSIS button (needs _sync_dev_to_parking)
+            def run_analysis() -> None:
+                zoning = state.get("zoning") or (ui_refs["zoning_select"].value if "zoning_select" in ui_refs else "")
+                flu = state.get("future_land_use") or (ui_refs["flu_select"].value if "flu_select" in ui_refs else "")
+                if not zoning and not flu:
+                    ui.notify("Set Zoning District and/or Future Land Use first.", type="warning")
+                    return
+                if zoning:
+                    state["zoning"] = zoning
+                if flu:
+                    state["future_land_use"] = flu
+                # Sync proposed dev → parking uses and calculate
+                _sync_dev_to_parking()
+                refresh_all()
+                tabs.set_value(tab3)
+                ui.notify("Analysis complete — see Requirements, Parking, and Landscape tabs.", type="positive")
+
+            analysis_btn.on_click(run_analysis)
 
 
 def render_tab_requirements() -> None:
@@ -853,7 +1043,14 @@ def render_tab_parking() -> None:
 
     with ui.card().classes("section-card w-full"):
         ui.label("Parking Input").classes("section-title")
-        ui.label("Add one row per use type. For a PUD with multiple uses, add each separately.").classes("muted q-mb-sm")
+        has_dev = any(r.get("use_type") for r in state.get("dev_uses", []))
+        if has_dev:
+            ui.label(
+                "Auto-populated from Proposed Development on the Property Lookup tab. "
+                "You can add additional uses or override values below."
+            ).classes("muted q-mb-sm")
+        else:
+            ui.label("Add one row per use type, or fill in Proposed Development on the Property Lookup tab to auto-populate.").classes("muted q-mb-sm")
 
         use_options = _parking_agent.get_use_type_options(county)
 
@@ -924,12 +1121,22 @@ def render_tab_parking() -> None:
         if not state.get("parking_uses"):
             state["parking_uses"] = [{"use_type": "", "building_sf": "", "num_units": ""}]
         _render_parking_rows()
+        ui_refs["_parking_render_fn"] = _render_parking_rows
+
+        def _do_calculate_parking() -> None:
+            refresh_parking()
+            has_data = any(r.get("use_type") for r in state.get("parking_uses", []))
+            if has_data:
+                ui.notify("Parking calculated — see results below.", type="positive")
+            else:
+                ui.notify("Select a use type and enter building SF or units first.", type="warning")
 
         with ui.row().classes("q-mt-sm gap-2"):
             ui.button("+ ADD USE", on_click=_add_parking_row, icon="add").props("outline")
-            ui.button("CALCULATE PARKING", on_click=refresh_parking, color="primary").props("icon=calculate")
+            ui.button("CALCULATE PARKING", on_click=_do_calculate_parking, color="primary").props("icon=calculate")
 
     with ui.card().classes("section-card q-mt-md w-full"):
+        ui.label("Parking Results").classes("section-title")
         md = ui.markdown(build_parking_markdown()).classes("q-mt-sm")
         ui_refs["parking_md"] = md
 
