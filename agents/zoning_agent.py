@@ -89,12 +89,29 @@ class ZoningAgent:
     def get_zoning_standards(self, county: str, zoning_code: str, city: str = "") -> Optional[Dict[str, Any]]:
         """Return dimensional standards for a zoning district code."""
         data = self._load(county, "zoning", city)
-        return data.get(zoning_code.upper().strip())
+        key = zoning_code.upper().strip()
+        result = data.get(key)
+        if result is None:
+            # Fallback: match by name (case-insensitive)
+            for code, d in data.items():
+                if code.startswith("_"):
+                    continue
+                if d.get("name", "").upper() == key:
+                    return d
+        return result
 
     def get_flum_standards(self, county: str, flum_code: str, city: str = "") -> Optional[Dict[str, Any]]:
         """Return density/intensity standards for a FLUM category code."""
         data = self._load(county, "flum", city)
-        return data.get(flum_code.upper().strip())
+        key = flum_code.upper().strip()
+        result = data.get(key)
+        if result is None:
+            for code, d in data.items():
+                if code.startswith("_"):
+                    continue
+                if d.get("name", "").upper() == key:
+                    return d
+        return result
 
     def get_zoning_options(self, county: str, city: str = "") -> Dict[str, str]:
         """Return {code: label} dict of all zoning districts for a county/city."""

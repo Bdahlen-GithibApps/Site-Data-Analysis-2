@@ -39,6 +39,38 @@ class ParkingAgent:
                 self._cache[county] = {}
         return self._cache[county]
 
+    def _load_for_jurisdiction(self, county: str, city: str = "") -> tuple:
+        """Try city-specific parking data first, fall back to county.
+
+        Returns (data_dict, source_label) where source_label describes
+        which jurisdiction the data came from.
+        """
+        if city:
+            city_key = city.lower().replace(" ", "_").replace(".", "")
+            if city_key not in self._cache:
+                path = Path(__file__).parent.parent / "data" / city_key / "parking.json"
+                if path.exists():
+                    with path.open() as f:
+                        self._cache[city_key] = json.load(f)
+                else:
+                    self._cache[city_key] = {}
+            city_data = self._cache[city_key]
+            if city_data:
+                return city_data, city
+        county_data = self._load(county)
+        label = f"{county} County"
+        if city:
+            label += f" (city-specific data not available for {city})"
+        return county_data, label
+
+    def has_city_data(self, city: str) -> bool:
+        """Check if city-specific parking data exists."""
+        if not city:
+            return False
+        city_key = city.lower().replace(" ", "_").replace(".", "")
+        path = Path(__file__).parent.parent / "data" / city_key / "parking.json"
+        return path.exists()
+
     # ──────────────────────────────────────────────────────────────────
     # ADA calculation (per ADA / Florida Building Code)
     # ──────────────────────────────────────────────────────────────────
@@ -60,31 +92,38 @@ class ParkingAgent:
     # Bicycle parking (Sec. 138-3603)
     # ──────────────────────────────────────────────────────────────────
 
-    def get_bicycle_spaces(self, county: str, motor_vehicle_spaces: int) -> int:
-        """Calculate required bicycle spaces. Logic extracted from BICYCLE_PARKING lambda."""
+    def get_bicycle_spaces(self, county: str, motor_vehicle_spaces: int, use_type: str = "") -> int:
+        """Calculate required bicycle spaces using per-use rate from parking table."""
         data = self._load(county)
+        rate_info = data.get("parking_requirements", {}).get(use_type, {})
+        bicycle_rate = rate_info.get("bicycle_rate", 0)
+        if bicycle_rate and motor_vehicle_spaces > 0:
+            return max(2, math.ceil(motor_vehicle_spaces * bicycle_rate))
+        # Fallback: older data format
         bp = data.get("bicycle_parking", {})
         min_spaces = bp.get("min_spaces", 2)
         per_mv = bp.get("spaces_per_motor_vehicle", 20)
-        return max(min_spaces, motor_vehicle_spaces // per_mv)
+        if per_mv and motor_vehicle_spaces > 0:
+            return max(min_spaces, motor_vehicle_spaces // per_mv)
+        return 0
 
     # ──────────────────────────────────────────────────────────────────
     # Parking rate lookup
     # ──────────────────────────────────────────────────────────────────
 
-    def get_parking_rate(self, county: str, use_type: str) -> Optional[Dict[str, Any]]:
+    def get_parking_rate(self, county: str, use_type: str, city: str = "") -> Optional[Dict[str, Any]]:
         """Return parking rate dict for a use type."""
-        data = self._load(county)
+        data, _ = self._load_for_jurisdiction(county, city)
         return data.get("parking_requirements", {}).get(use_type)
 
-    def get_use_type_options(self, county: str) -> Dict[str, str]:
+    def get_use_type_options(self, county: str, city: str = "") -> Dict[str, str]:
         """Return {use_type: use_type} dict for UI dropdowns."""
-        data = self._load(county)
+        data, _ = self._load_for_jurisdiction(county, city)
         return {k: k for k in data.get("parking_requirements", {}).keys()}
 
-    def get_dimensions(self, county: str) -> Dict[str, Any]:
+    def get_dimensions(self, county: str, city: str = "") -> Dict[str, Any]:
         """Return parking stall dimensions table."""
-        data = self._load(county)
+        data, _ = self._load_for_jurisdiction(county, city)
         return data.get("parking_dimensions", {})
 
     # ──────────────────────────────────────────────────────────────────
@@ -97,17 +136,21 @@ class ParkingAgent:
         use_type: str,
         building_sf: float = 0.0,
         num_units: int = 0,
+        city: str = "",
     ) -> Dict[str, Any]:
         """
         Calculate parking requirements for a use type.
 
         Returns:
             use_type, rate_description, required_spaces, max_spaces,
-            ada_spaces, bicycle_spaces, dimensions, error (if any)
+            ada_spaces, bicycle_spaces, dimensions, data_source, error (if any)
         """
-        rate = self.get_parking_rate(county, use_type)
+        data, data_source = self._load_for_jurisdiction(county, city)
+        reqs = data.get("parking_requirements", {})
+        rate = reqs.get(use_type)
         if not rate:
-            return {"error": f"Use type '{use_type}' not found in parking tables for {county}."}
+            return {"error": f"Use type '{use_type}' not found in parking tables for {data_source}.",
+                    "data_source": data_source}
 
         unit = rate.get("unit", "")
         min_per_unit = rate.get("min_per_unit")
@@ -128,7 +171,11 @@ class ParkingAgent:
             calc_spaces = math.ceil(min_per_unit * num_units)
 
         ada_spaces = self.get_ada_spaces(county, calc_spaces) if calc_spaces > 0 else 0
-        bicycle_spaces = self.get_bicycle_spaces(county, calc_spaces) if calc_spaces > 0 else 0
+        bicycle_spaces = self.get_bicycle_spaces(county, calc_spaces, use_type) if calc_spaces > 0 else 0
+
+        # Code reference from data
+        source_url = data.get("_url", "")
+        source_section = data.get("_source", "")
 
         return {
             "use_type": use_type,
@@ -139,7 +186,10 @@ class ParkingAgent:
             "max_spaces": max_spaces,
             "ada_spaces": ada_spaces,
             "bicycle_spaces": bicycle_spaces,
-            "dimensions": self.get_dimensions(county),
+            "dimensions": data.get("parking_dimensions", {}),
             "building_sf": building_sf,
             "num_units": num_units,
+            "data_source": data_source,
+            "source_section": source_section,
+            "source_url": source_url,
         }

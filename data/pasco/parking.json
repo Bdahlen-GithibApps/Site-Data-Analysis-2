@@ -1,168 +1,273 @@
 {
-  "_source": "Pasco County Land Development Code (LDC) Section 500.3 — Off-Street Parking and Loading Requirements",
-  "_url": "https://library.municode.com/fl/pasco_county/codes/land_development_code",
+  "_source": "Pasco County Land Development Code (LDC) Section 907.1 — On-Site Parking",
+  "_url": "https://library.municode.com/fl/pasco_county/codes/land_development_code?nodeId=CH900DEST_S907TEPALOSTLIST_907.1TEPA",
+  "_last_verified": "2026-04-16",
   "parking_requirements": {
     "Single Family Detached": {
-      "min_rate": "2 per dwelling unit",
+      "min_rate": "2 per unit (1-3 BR); 3 per unit (4+ BR)",
       "min_per_unit": 2.0,
       "unit": "dwelling unit",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0,
+      "notes": "If on-street parking not permitted, 0.25 visitor space/unit required within 200 ft"
     },
     "Single Family Attached": {
-      "min_rate": "2 per dwelling unit",
+      "min_rate": "2 per unit (1-3 BR); 3 per unit (4+ BR)",
       "min_per_unit": 2.0,
       "unit": "dwelling unit",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0,
+      "notes": "If on-street parking not permitted, 0.25 visitor space/unit required within 200 ft"
     },
     "Duplex": {
-      "min_rate": "2 per dwelling unit",
+      "min_rate": "2 per unit (1-3 BR); 3 per unit (4+ BR)",
       "min_per_unit": 2.0,
       "unit": "dwelling unit",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0
     },
-    "Multi-Family (Studio/1BR)": {
-      "min_rate": "1.5 per dwelling unit",
-      "min_per_unit": 1.5,
+    "Multi-Family (Studio)": {
+      "min_rate": "1 per unit",
+      "min_per_unit": 1.0,
       "unit": "dwelling unit",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Plus 0.25 visitor space/unit"
     },
-    "Multi-Family (2+ BR)": {
-      "min_rate": "2 per dwelling unit",
+    "Multi-Family (1-3 BR)": {
+      "min_rate": "2 per unit",
       "min_per_unit": 2.0,
       "unit": "dwelling unit",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Plus 0.25 visitor space/unit"
     },
-    "ALF / Group Home": {
-      "min_rate": "0.5 per bed/resident",
-      "min_per_unit": 0.5,
+    "Multi-Family (4+ BR)": {
+      "min_rate": "3 per unit",
+      "min_per_unit": 3.0,
+      "unit": "dwelling unit",
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Plus 0.25 visitor space/unit"
+    },
+    "Assisted Living Facility": {
+      "min_rate": "1 per employee on largest shift + 1 per 4 beds + 1 per facility vehicle",
+      "min_per_unit": 0.25,
       "unit": "bed",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Plus employee and vehicle parking"
     },
     "Mobile Home": {
-      "min_rate": "2 per dwelling unit",
+      "min_rate": "2 per unit (1-3 BR); 3 per unit (4+ BR)",
       "min_per_unit": 2.0,
       "unit": "dwelling unit",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0
     },
     "Office (General)": {
-      "min_rate": "3.5 per 1,000 sf GFA",
-      "min_per_unit": 3.5,
+      "min_rate": "1 per 300 SF GFA (3.33 per 1,000 SF)",
+      "min_per_unit": 3.33,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
     "Office (Medical/Dental)": {
-      "min_rate": "5 per 1,000 sf GFA",
+      "min_rate": "1 per 200 SF GFA (5 per 1,000 SF)",
       "min_per_unit": 5.0,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
-    "Retail (General)": {
-      "min_rate": "4.5 per 1,000 sf GFA",
-      "min_per_unit": 4.5,
+    "Office (Government)": {
+      "min_rate": "1 per 300 SF GFA (3.33 per 1,000 SF)",
+      "min_per_unit": 3.33,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Additional spaces required for public assembly, festivals, customer service, elections"
     },
-    "Shopping Center": {
-      "min_rate": "5 per 1,000 sf GFA",
+    "Retail / Shopping Center": {
+      "min_rate": "1 per 300 SF GFA (3.33 per 1,000 SF)",
+      "min_per_unit": 3.33,
+      "unit": "1,000 sf GFA",
+      "max_limit": null,
+      "bicycle_rate": 0.02
+    },
+    "Personal Services": {
+      "min_rate": "1 per 200 SF (5 per 1,000 SF)",
       "min_per_unit": 5.0,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.10
     },
-    "Restaurant (Sit-down)": {
-      "min_rate": "10 per 1,000 sf GFA (or 1 per 75 sf dining)",
+    "Bank / Financial Institution": {
+      "min_rate": "1 per 250 SF (4 per 1,000 SF)",
+      "min_per_unit": 4.0,
+      "unit": "1,000 sf GFA",
+      "max_limit": null,
+      "bicycle_rate": 0.10,
+      "notes": "Stacking per Sec 907.3 if drive-through"
+    },
+    "Restaurant (No Drive-Through)": {
+      "min_rate": "1 per 100 SF up to 6,000 SF + 1 per 75 SF over 6,000 SF (10 per 1,000 SF base)",
       "min_per_unit": 10.0,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Includes outdoor/semi-enclosed eating area"
     },
-    "Restaurant (Fast Food)": {
-      "min_rate": "12 per 1,000 sf GFA",
-      "min_per_unit": 12.0,
+    "Restaurant (With Drive-Through)": {
+      "min_rate": "1 per 150 SF up to 6,000 SF + 1 per 75 SF over 6,000 SF (6.67 per 1,000 SF base)",
+      "min_per_unit": 6.67,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "Stacking per Sec 907.3"
     },
-    "Convenience Store": {
-      "min_rate": "5 per 1,000 sf GFA",
-      "min_per_unit": 5.0,
+    "Restaurant (Take-out)": {
+      "min_rate": "1 per 300 SF + 1 per employee on largest shift",
+      "min_per_unit": 3.33,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02,
+      "notes": "No seating area provided"
+    },
+    "Bar / Tavern / Club": {
+      "min_rate": "1 per 75 SF (13.33 per 1,000 SF)",
+      "min_per_unit": 13.33,
+      "unit": "1,000 sf GFA",
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
     "Hotel/Motel": {
-      "min_rate": "1 per guest room + 1 per employee peak shift",
+      "min_rate": "1 per room",
       "min_per_unit": 1.0,
-      "unit": "guest room",
-      "max_limit": null
+      "unit": "room",
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
-    "Warehouse/Storage": {
-      "min_rate": "1 per 1,000 sf GFA",
-      "min_per_unit": 1.0,
+    "Home Improvement (<20,000 SF)": {
+      "min_rate": "1 per 300 SF GFA (3.33 per 1,000 SF)",
+      "min_per_unit": 3.33,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
-    "Light Manufacturing": {
-      "min_rate": "1.5 per 1,000 sf GFA",
-      "min_per_unit": 1.5,
+    "Home Improvement (>20,000 SF)": {
+      "min_rate": "1 per 400 SF GFA (2.5 per 1,000 SF)",
+      "min_per_unit": 2.5,
       "unit": "1,000 sf GFA",
-      "max_limit": null
-    },
-    "Heavy Industrial": {
-      "min_rate": "1 per 1,000 sf GFA",
-      "min_per_unit": 1.0,
-      "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
     "Self-Storage": {
-      "min_rate": "1 per 5,000 sf GFA + 2 for office",
-      "min_per_unit": 0.2,
+      "min_rate": "5 spaces",
+      "min_per_unit": 5,
+      "unit": "facility",
+      "max_limit": null,
+      "bicycle_rate": 1
+    },
+    "Manufacturing / Assembly": {
+      "min_rate": "1 per 700 SF (1.43 per 1,000 SF)",
+      "min_per_unit": 1.43,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0
     },
-    "Church/Place of Worship": {
-      "min_rate": "1 per 3 seats in main assembly",
-      "min_per_unit": 0.33,
-      "unit": "seat",
-      "max_limit": null
-    },
-    "School (Elementary/Middle)": {
-      "min_rate": "2 per classroom",
+    "Flex Space": {
+      "min_rate": "Per site/traffic analysis, min 1 per 500 SF (2 per 1,000 SF)",
       "min_per_unit": 2.0,
-      "unit": "classroom",
-      "max_limit": null
+      "unit": "1,000 sf GFA",
+      "max_limit": null,
+      "bicycle_rate": 0
     },
-    "School (High School)": {
-      "min_rate": "5 per classroom",
-      "min_per_unit": 5.0,
-      "unit": "classroom",
-      "max_limit": null
-    },
-    "Day Care": {
-      "min_rate": "1 per 8 children capacity + 1 per employee",
+    "Warehouse": {
+      "min_rate": "1 per employee + 1 per vehicle + sufficient space for peak vehicles",
       "min_per_unit": null,
       "unit": "special",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0
+    },
+    "Church/Place of Worship": {
+      "min_rate": "1 per 3 seats in main assembly (or 1 per 35 SF if no fixed seats)",
+      "min_per_unit": 0.33,
+      "unit": "seat",
+      "max_limit": null,
+      "bicycle_rate": 0.10
+    },
+    "School (Elementary/Middle)": {
+      "min_rate": "1 per faculty member (or SREF)",
+      "min_per_unit": 1.0,
+      "unit": "faculty member",
+      "max_limit": null,
+      "bicycle_rate": 0.50,
+      "notes": "Plus adequate parking for special events"
+    },
+    "School (High School)": {
+      "min_rate": "10 per classroom + 1 per admin/staff position (or SREF)",
+      "min_per_unit": 10.0,
+      "unit": "classroom",
+      "max_limit": null,
+      "bicycle_rate": 0.50
+    },
+    "College / University": {
+      "min_rate": "1 per student + 1 per admin/staff",
+      "min_per_unit": 1.0,
+      "unit": "student",
+      "max_limit": null,
+      "bicycle_rate": 0.50
+    },
+    "Day Care": {
+      "min_rate": "1 per staff + 1 per 15 clients of licensed capacity",
+      "min_per_unit": null,
+      "unit": "special",
+      "max_limit": null,
+      "bicycle_rate": 0
     },
     "Hospital": {
-      "min_rate": "2 per bed",
-      "min_per_unit": 2.0,
+      "min_rate": "1 per bed",
+      "min_per_unit": 1.0,
       "unit": "bed",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02
+    },
+    "Convalescent / Nursing Home": {
+      "min_rate": "1 per 4 beds",
+      "min_per_unit": 0.25,
+      "unit": "bed",
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
     "Fitness/Health Club": {
-      "min_rate": "5 per 1,000 sf GFA",
-      "min_per_unit": 5.0,
+      "min_rate": "1 per 100 SF (10 per 1,000 SF)",
+      "min_per_unit": 10.0,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.05
     },
     "Golf Course": {
       "min_rate": "4 per hole",
       "min_per_unit": 4.0,
       "unit": "hole",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0.02
     },
-    "Nursery / Garden Center": {
-      "min_rate": "2 per 1,000 sf GFA",
-      "min_per_unit": 2.0,
+    "Auto Repair": {
+      "min_rate": "4 per bay + 1 per employee",
+      "min_per_unit": 4.0,
+      "unit": "bay",
+      "max_limit": null,
+      "bicycle_rate": 0,
+      "notes": "Service bays are not counted as spaces"
+    },
+    "Auto Sales": {
+      "min_rate": "1 per 400 SF GFA + 4 per service bay",
+      "min_per_unit": 2.5,
       "unit": "1,000 sf GFA",
-      "max_limit": null
+      "max_limit": null,
+      "bicycle_rate": 0,
+      "notes": "In addition to display areas"
     }
   },
   "ada_parking_table": [
@@ -178,50 +283,64 @@
     {"total_spaces_min": 501, "total_spaces_max": 1000, "accessible_required": 10, "note": "2% of total (minimum 10)"}
   ],
   "parking_dimensions": {
+    "standard_space": {
+      "stall_width": 9.0,
+      "stall_depth": 20.0,
+      "note": "Minimum per vehicle, exclusive of driveway or circulation area"
+    },
+    "compact_space": {
+      "stall_width": 8.0,
+      "stall_depth": 18.0,
+      "note": "Commercial/industrial may use 75% full / 25% compact ratio"
+    },
+    "smart_car_space": {
+      "stall_width": 8.0,
+      "stall_depth": 16.0
+    },
+    "motorcycle_space": {
+      "stall_width": 4.0,
+      "stall_depth": 12.0
+    },
     "90_degree": {
       "angle": 90,
       "stall_width": 9.0,
-      "stall_depth": 18.0,
-      "aisle_width_two_way": 24.0,
-      "aisle_width_one_way": 22.0
+      "stall_depth": 20.0,
+      "aisle_width_one_way": 24.0,
+      "aisle_width_two_way": 24.0
     },
     "60_degree": {
       "angle": 60,
       "stall_width": 9.0,
-      "stall_depth": 18.0,
-      "aisle_width_two_way": 24.0,
-      "aisle_width_one_way": 18.0
+      "stall_depth": 20.0,
+      "aisle_width_one_way": 18.0,
+      "aisle_width_two_way": 24.0
     },
     "45_degree": {
       "angle": 45,
       "stall_width": 9.0,
-      "stall_depth": 18.0,
-      "aisle_width_two_way": 24.0,
-      "aisle_width_one_way": 14.0
+      "stall_depth": 20.0,
+      "aisle_width_one_way": 15.0,
+      "aisle_width_two_way": 24.0
     },
     "parallel": {
       "angle": 0,
-      "stall_width": 8.0,
-      "stall_depth": 22.0,
-      "aisle_width_two_way": 24.0,
-      "aisle_width_one_way": 12.0
+      "stall_width": 9.0,
+      "stall_depth": 24.0,
+      "aisle_width_one_way": 15.0,
+      "aisle_width_two_way": 24.0
     },
     "accessible": {
       "stall_width": 12.0,
-      "stall_depth": 18.0,
-      "note": "ADA standard: 8 ft stall + 5 ft access aisle (13 ft total); van-accessible: 8 ft + 8 ft aisle (16 ft total)"
+      "stall_depth": 20.0,
+      "note": "ADA standard: 8 ft stall + 5 ft access aisle; van-accessible: 8 ft + 8 ft aisle"
     }
   },
   "bicycle_parking": {
-    "general_rule": "1 bicycle space per 20 motor vehicle spaces required, minimum 2 (LDC Sec. 500.3)",
-    "calculation_formula": "1 bicycle space per 20 motor vehicle spaces required, minimum 2",
-    "min_spaces": 2,
-    "spaces_per_motor_vehicle": 20
+    "general_rule": "Per-use bicycle rates specified in parking requirements table (Section 907.1.E)",
+    "note": "Bicycle parking facilities shall include provisions for secure storage and locking"
   },
   "loading_requirements": {
-    "0-9999": "No loading berth required (unless use requires deliveries)",
-    "10000-49999": "1 berth (min 12 ft × 35 ft × 14 ft vertical clearance)",
-    "50000-99999": "2 berths",
-    "100000+": "3 berths + 1 per additional 100,000 sf GFA"
+    "default_berth_size": "50 ft deep × 12 ft wide × 14 ft overhead clearance",
+    "notes": "Standard parking space may be appropriate for offices, banks, or similar uses where typical delivery is not by semi-tractor trailer"
   }
 }
