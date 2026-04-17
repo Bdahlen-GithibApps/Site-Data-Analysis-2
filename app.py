@@ -24,6 +24,7 @@ from agents.parking_agent import ParkingAgent
 from agents.landscape_agent import LandscapeAgent
 from agents.infrastructure_agent import InfrastructureAgent
 from agents.environmental_agent import EnvironmentalAgent
+from agents import get_code_urls, get_code_url
 from tools.scraper import scrape_pinellas_property, scrape_pasco_property, expand_city_name, lookup_dor_use_code, get_pinellas_adjacent_uses
 from tools.helpers import (
     safe_float,
@@ -226,7 +227,12 @@ def build_requirements_markdown() -> str:
                 lines.append(f"✅ Site area ({fmt_num(site_sf)} sf) meets minimum ({fmt_num(min_sf)} sf)")
             lines.append("")
     elif zoning_code:
-        lines.append(f"⚠️ Zoning district **{zoning_code}** not found in data tables.")
+        zoning_ref = get_code_url(county, "zoning", city)
+        if zoning_ref:
+            lines.append(f"⚠️ Zoning district **{zoning_code}** not found in compiled data. "
+                         f"Look up standards in [{zoning_ref['section']}]({zoning_ref['url']})")
+        else:
+            lines.append(f"⚠️ Zoning district **{zoning_code}** not found in data tables.")
         lines.append("")
 
     # FLUM
@@ -270,29 +276,32 @@ def build_requirements_markdown() -> str:
                 lines.append(f"⚠️ Zoning **{zoning_code}** may not be consistent with FLU **{flu_code}** — compatible: {', '.join(flu.get('compatible_zoning', []))}")
             lines.append("")
     elif flu_code:
-        lines.append(f"⚠️ FLU category **{flu_code}** not found in data tables.")
+        flum_ref = get_code_url(county, "flum", city)
+        if flum_ref:
+            lines.append(f"⚠️ FLU category **{flu_code}** not found in compiled data. "
+                         f"Look up in [{flum_ref['section']}]({flum_ref['url']})")
+        else:
+            lines.append(f"⚠️ FLU category **{flu_code}** not found in data tables.")
         lines.append("")
 
     # Code references — dynamic based on jurisdiction
     city_lower = city.strip().lower()
     lines.append("---")
     lines.append("**Code References:**")
-    if "st. pete" in city_lower or "st pete" in city_lower or "saint pete" in city_lower:
-        lines.append(
-            "City of St. Petersburg Land Development Regulations (LDR), Chapter 16 — Zoning Districts · "
-            "City of St. Petersburg Comprehensive Plan — Future Land Use Element · stpete.org/ldr"
-        )
-    elif county == "Pasco":
-        lines.append(
-            "Pasco County Land Development Code (LDC) — Chapters 500–522 Zoning Districts · "
-            "Pasco County Comprehensive Plan — Future Land Use Element · library.municode.com/fl/pasco_county"
-        )
+    code_urls = get_code_urls(county, city)
+    if code_urls:
+        jur_label = code_urls.get("label", county)
+        zoning_ref = code_urls.get("zoning", {})
+        flum_ref = code_urls.get("flum", {})
+        refs = []
+        if zoning_ref:
+            refs.append(f"[{zoning_ref['section']}]({zoning_ref['url']})")
+        if flum_ref:
+            refs.append(f"[{flum_ref['section']}]({flum_ref['url']})")
+        lines.append(f"**{jur_label}:** " + " · ".join(refs))
     else:
         jurisdiction = _zoning_agent.get_jurisdiction_name(county, city)
-        lines.append(
-            f"{jurisdiction} — Ch. 138, Art. III — Zoning Districts · Sec. 138-3501 — Building Height · "
-            "Sec. 138-3505 — Setbacks · Comprehensive Plan — Future Land Use Element"
-        )
+        lines.append(f"{jurisdiction} — Zoning Districts & Future Land Use Element")
 
     return "\n".join(lines)
 
@@ -408,19 +417,34 @@ def build_parking_markdown() -> str:
         if data_source:
             lines.append(f"**Data from:** {data_source}")
         if city and not _parking_agent.has_city_data(city):
-            lines.append(f"")
-            lines.append(f"⚠️ *City-specific parking standards for **{city}** are not yet available. "
-                         f"Showing **{county} County** standards as a reference. "
-                         f"Verify requirements with the city before submitting.*")
+            parking_ref = get_code_url(county, "parking", city)
+            lines.append("")
+            if parking_ref:
+                lines.append(
+                    f"⚠️ *City-specific parking standards for **{city}** are not yet compiled into data tables. "
+                    f"Showing **{county} County** standards as a reference. "
+                    f"Verify requirements in [{parking_ref['section']}]({parking_ref['url']}).*"
+                )
+            else:
+                lines.append(
+                    f"⚠️ *City-specific parking standards for **{city}** are not yet available. "
+                    f"Showing **{county} County** standards as a reference. "
+                    f"Verify requirements with the city before submitting.*"
+                )
 
     return "\n".join(lines)
 
 
 def build_landscape_markdown() -> str:
     county = state.get("county", "Pinellas")
-    reqs = _landscape_agent.get_requirements(county)
+    city = state.get("city", "")
+    reqs = _landscape_agent.get_requirements(county, city=city)
 
     if not reqs.get("available"):
+        land_ref = get_code_url(county, "landscape", city)
+        if land_ref:
+            return (f"*Landscape data tables not yet compiled for this jurisdiction. "
+                    f"Refer to [{land_ref['section']}]({land_ref['url']}) for requirements.*")
         return f"*{reqs.get('message', 'Landscape data not available for this county.')}*"
 
     lines: List[str] = []
@@ -511,7 +535,11 @@ def build_landscape_markdown() -> str:
         lines.append("")
 
     lines.append("---")
-    lines.append("**Code References:** Ch. 138, Art. IV — Landscaping & Tree Protection · Sec. 138-3800 thru 138-3804")
+    land_ref = get_code_url(county, "landscape", city)
+    if land_ref:
+        lines.append(f"**Code References:** [{land_ref['section']}]({land_ref['url']})")
+    else:
+        lines.append("**Code References:** Verify landscape requirements with the local jurisdiction.")
 
     return "\n".join(lines)
 
@@ -695,11 +723,41 @@ def render_tab_lookup() -> None:
                     else:
                         if "zoning_city_label" in ui_refs:
                             detected_city = state.get("city", "")
-                            ui_refs["zoning_city_label"].text = (
-                                f"City detected: {detected_city} — open the zoning map above, "
-                                "find the zoning code, then enter it below."
-                            )
+                            code_entry = get_code_urls(county, detected_city)
+                            if code_entry:
+                                jur_label = code_entry.get("label", detected_city)
+                                ui_refs["zoning_city_label"].text = (
+                                    f"City detected: {detected_city} ({jur_label}) — "
+                                    "open the zoning map above, find the zoning code, then enter it below."
+                                )
+                            else:
+                                ui_refs["zoning_city_label"].text = (
+                                    f"City detected: {detected_city} — open the zoning map above, "
+                                    "find the zoning code, then enter it below."
+                                )
                             ui_refs["zoning_city_label"].update()
+
+                    # Populate code reference links
+                    ref_container = ui_refs.get("_code_refs_row")
+                    if ref_container is not None:
+                        detected_city = state.get("city", "")
+                        code_entry = get_code_urls(county, detected_city)
+                        ref_container.clear()
+                        with ref_container:
+                            if code_entry:
+                                jur_label = code_entry.get("label", county)
+                                ui.label(f"{jur_label} — Land Development Code:").classes("text-weight-bold text-caption")
+                                for topic, icon in [("zoning", "gavel"), ("parking", "local_parking"),
+                                                     ("landscape", "park"), ("flum", "map")]:
+                                    ref = code_entry.get(topic)
+                                    if ref:
+                                        ui.button(
+                                            ref["section"],
+                                            on_click=lambda _, u=ref["url"]: ui.navigate.to(u, new_tab=True),
+                                            icon=icon,
+                                        ).props("outline dense").classes("link-btn")
+                            else:
+                                ui.label("No LDC references available for this jurisdiction.").classes("muted")
 
                     refresh_all()
                     ui.notify("Property data retrieved.", type="positive")
@@ -850,6 +908,12 @@ def render_tab_lookup() -> None:
                 )
                 flu_input.on("change", lambda e: set_field("future_land_use", (e.value or "").split(" — ")[0].strip()))
                 ui_refs["flu_select"] = flu_input  # alias kept for run_analysis() compatibility
+
+                # Code reference links — populated after parcel lookup
+                code_refs_row = ui.row().classes("w-full flex-wrap gap-2 q-mt-md")
+                ui_refs["_code_refs_row"] = code_refs_row
+                with code_refs_row:
+                    ui.label("Look up a parcel to see LDC code references.").classes("muted")
 
 
 
@@ -1555,7 +1619,7 @@ ui.add_css(
 # Main layout
 # ──────────────────────────────────────────────────────────────────────
 ui.label("Development Code Lookup").classes("text-h4 q-mb-sm")
-ui.label("Florida — Pinellas & Pasco Counties · Land Development Code & Comprehensive Plan").classes("muted q-mb-md")
+ui.label("Florida — Pinellas · Pasco · Hillsborough Counties · Land Development Code & Comprehensive Plan").classes("muted q-mb-md")
 
 with ui.row().classes("w-full items-center justify-between q-mb-sm"):
     ui.button(

@@ -17,20 +17,7 @@ from tools.arcgis_client import ArcGISClient
 
 logger = logging.getLogger(__name__)
 
-# Map normalized city names to their data folder slug.
-# Add entries here as city-specific data files are created.
-_CITY_SLUG_MAP: Dict[str, str] = {
-    "st. petersburg": "st_petersburg",
-    "st petersburg": "st_petersburg",
-    "saint petersburg": "st_petersburg",
-}
-
-
-def _city_slug(city: str) -> Optional[str]:
-    """Return the data folder slug for a city, or None if no city-specific data exists."""
-    if not city:
-        return None
-    return _CITY_SLUG_MAP.get(city.strip().lower())
+from agents import city_slug as _city_slug
 
 
 class ZoningAgent:

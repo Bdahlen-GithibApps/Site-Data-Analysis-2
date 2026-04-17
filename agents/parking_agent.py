@@ -13,6 +13,8 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from agents import city_slug as _city_slug
+
 logger = logging.getLogger(__name__)
 
 _ADA_PERCENTAGE = 0.02  # 2% of total spaces for lots > 500
@@ -46,17 +48,18 @@ class ParkingAgent:
         which jurisdiction the data came from.
         """
         if city:
-            city_key = city.lower().replace(" ", "_").replace(".", "")
-            if city_key not in self._cache:
+            city_key = _city_slug(city)
+            if city_key and city_key not in self._cache:
                 path = Path(__file__).parent.parent / "data" / city_key / "parking.json"
                 if path.exists():
                     with path.open() as f:
                         self._cache[city_key] = json.load(f)
                 else:
                     self._cache[city_key] = {}
-            city_data = self._cache[city_key]
-            if city_data:
-                return city_data, city
+            if city_key:
+                city_data = self._cache.get(city_key, {})
+                if city_data:
+                    return city_data, city
         county_data = self._load(county)
         label = f"{county} County"
         if city:
@@ -67,7 +70,9 @@ class ParkingAgent:
         """Check if city-specific parking data exists."""
         if not city:
             return False
-        city_key = city.lower().replace(" ", "_").replace(".", "")
+        city_key = _city_slug(city)
+        if not city_key:
+            return False
         path = Path(__file__).parent.parent / "data" / city_key / "parking.json"
         return path.exists()
 
