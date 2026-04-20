@@ -377,8 +377,16 @@ class InfrastructureAgent:
             return {"error": "Could not geocode the address. Ensure a property has been looked up first."}
 
         # Route by county
-        if (county or "").strip() == "Pasco":
+        county_name = (county or "").strip()
+        if county_name == "Pasco":
             return self._lookup_pasco(address, city, zip_code, lat, lon)
+        if county_name != "Pinellas":
+            return {
+                "error": (
+                    f"Infrastructure auto-lookup is not yet implemented for {county_name} County. "
+                    "Use Pinellas or Pasco lookup for automated infrastructure fields."
+                )
+            }
 
         # ── Pinellas (default) ─────────────────────────────────────────
         # ── Utility Providers ──────────────────────────────────────────

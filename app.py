@@ -15,6 +15,7 @@ Run:
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Dict, List
 
 from nicegui import ui, run
@@ -61,7 +62,7 @@ def _build_parcel_links(county: str, parcel_id: str, address: str, city: str) ->
         links.append({"label": "Deed / OR Records", "url": f"https://pascoclerk.com/official-records-search/?SearchType=parcel&Parcel={parcel_id}"})
         # Pasco Development Services
         links.append({"label": "Development Services", "url": "https://pascogov.com/developmentservices"})
-    else:
+    elif county == "Pinellas":
         # Pinellas County Property Appraiser
         pid_clean = parcel_id.replace("-", "")
         links.append({"label": "Property Appraiser", "url": f"https://www.pcpao.gov/general.php?parcel={pid_clean}"})
@@ -71,6 +72,12 @@ def _build_parcel_links(county: str, parcel_id: str, address: str, city: str) ->
         links.append({"label": "Deed / OR Records", "url": f"https://officialrecords.mypinellasclerk.org/search/SearchTypeParcel?ParcelID={pid_clean}"})
         # Pinellas Building / DRS
         links.append({"label": "Building & DRS", "url": "https://pinellascounty.org/build/"})
+    else:
+        # Unsupported counties: avoid showing incorrect county-specific links.
+        county_q = county.replace(" ", "+")
+        links.append({"label": "County Property Search", "url": f"https://www.google.com/search?q={county_q}+County+Property+Appraiser+parcel+search"})
+        links.append({"label": "County GIS", "url": f"https://www.google.com/search?q={county_q}+County+GIS+parcel+map"})
+        links.append({"label": "County Development Services", "url": f"https://www.google.com/search?q={county_q}+County+development+services"})
     # FEMA flood map — same for all counties
     links.append({"label": "FEMA Flood Map", "url": fema_url})
     # SWFWMD ePermitting
@@ -159,6 +166,25 @@ state: Dict[str, Any] = {
 }
 
 ui_refs: Dict[str, Any] = {}
+
+# Fee section labels used in the Fees tab and Excel export.
+FEE_SECTION_LABELS = {
+    "application_fees":   "Application & Permit Fees",
+    "impact_fees":        "Impact Fees",
+    "pre_app":            "Pre-Application Meeting",
+    "perm_steps":         "Permitting Steps",
+    "local_permits":      "Local Permitting (County / City)",
+    "wmd":                "SWFWMD Permitting",
+    "fdep":               "FDEP Permitting",
+    "fdot":               "FDOT Permitting",
+    "dedication":         "ROW Dedication / Easements",
+    "securities":         "Securities & Utility Connection Fees",
+    "coastal_dev_permit": "Coastal Development Permit",
+    "entitlements":       "Entitlements Process",
+    "lot_line":           "Lot Line / Subdivision",
+    "staff_meetings":     "Required Staff Meetings",
+    "public_meetings":    "Required Public Meetings",
+}
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -563,10 +589,16 @@ def refresh_landscape() -> None:
         ui_refs["landscape_md"].set_content(build_landscape_markdown())
 
 
+def refresh_fees() -> None:
+    if "_fees_refresh" in ui_refs:
+        ui_refs["_fees_refresh"]()
+
+
 def refresh_all() -> None:
     refresh_requirements()
     refresh_parking()
     refresh_landscape()
+    refresh_fees()
 
 
 def set_field(key: str, value: Any) -> None:
@@ -610,8 +642,8 @@ def render_tab_lookup() -> None:
                     )
                     ui_refs["parcel_id_input"] = parcel_input
                     ui_refs["county_input"] = county_input
-                    parcel_input.on("change", lambda e: state.__setitem__("parcel_id", e.value))
-                    county_input.on("change", lambda e: state.__setitem__("county", e.value))
+                    parcel_input.on("update:model-value", lambda e: state.__setitem__("parcel_id", e.args))
+                    county_input.on("update:model-value", lambda e: state.__setitem__("county", e.args))
 
                 async def do_lookup() -> None:
                     parcel_id = (parcel_input.value or state.get("parcel_id") or "").strip()
@@ -630,8 +662,17 @@ def render_tab_lookup() -> None:
                     ui.notify("Fetching property data...", type="info")
                     if county == "Pasco":
                         result = await run.io_bound(scrape_pasco_property, parcel_id)
-                    else:
+                    elif county == "Pinellas":
                         result = await run.io_bound(scrape_pinellas_property, parcel_id)
+                    else:
+                        lookup_btn.enable()
+                        ui.notify(
+                            f"Parcel lookup is not yet implemented for {county} County. "
+                            "Use Pinellas or Pasco for automated parcel data, or enter fields manually.",
+                            type="warning",
+                            timeout=8000,
+                        )
+                        return
                     if not result.get("success"):
                         lookup_btn.enable()
                         ui.notify(result.get("error", "Lookup failed"), type="negative")
@@ -838,7 +879,7 @@ def render_tab_lookup() -> None:
                 ui_refs["site_area_sqft"] = labeled_input("Site Area (sf)", value=state.get("site_area_sqft", ""), classes="lookup-field")
 
                 for key in ("address", "city", "zip", "owner", "land_use", "site_area_acres", "site_area_sqft"):
-                    ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
+                    ui_refs[key].on("update:model-value", lambda e, k=key: set_field(k, e.args))
 
             # Site description (SIR manual fields)
             with ui.card().classes("section-card q-mt-md w-full"):
@@ -848,7 +889,7 @@ def render_tab_lookup() -> None:
                 ui_refs["adjoining_uses"] = labeled_input("Adjoining Property Uses and Zoning", value=state.get("adjoining_uses", ""), placeholder="e.g. Zoning: DC-1, Uses: Retail", classes="lookup-field")
                 ui_refs["proposed_zoning"] = labeled_input("Proposed Zoning / Designation", value=state.get("proposed_zoning", ""), placeholder="e.g. CBD", classes="lookup-field")
                 for key in ("tax_parcel", "site_views", "adjoining_uses", "proposed_zoning"):
-                    ui_refs[key].on("change", lambda e, k=key: set_field(k, e.value))
+                    ui_refs[key].on("update:model-value", lambda e, k=key: set_field(k, e.args))
 
             # Quick Links — populated after lookup
             with ui.card().classes("section-card q-mt-md w-full"):
@@ -897,7 +938,7 @@ def render_tab_lookup() -> None:
                     placeholder="e.g. NT-1, CC-2, CG, DC-1 ...",
                     classes="code-field",
                 )
-                zoning_input.on("change", on_zoning_changed)
+                zoning_input.on_value_change(on_zoning_changed)
                 ui_refs["zoning_select"] = zoning_input  # alias kept for run_analysis() compatibility
 
                 flu_input = labeled_input(
@@ -906,7 +947,7 @@ def render_tab_lookup() -> None:
                     placeholder="e.g. CMU, RES-1, NC, R-6 ...",
                     classes="code-field",
                 )
-                flu_input.on("change", lambda e: set_field("future_land_use", (e.value or "").split(" — ")[0].strip()))
+                flu_input.on_value_change(lambda e: set_field("future_land_use", (e.value or "").split(" — ")[0].strip()))
                 ui_refs["flu_select"] = flu_input  # alias kept for run_analysis() compatibility
 
                 # Code reference links — populated after parcel lookup
@@ -966,50 +1007,41 @@ def render_tab_parking() -> None:
                     with ui.row().classes("w-full items-end no-wrap gap-2"):
                         with ui.column().classes("col-5"):
                             ui.label("Use Type").classes("text-caption text-grey-7")
-                            sel = ui.select(
+                            ui.select(
                                 use_options,
                                 value=row.get("use_type") or None,
                                 with_input=True,
+                                on_change=lambda e, i=idx: (
+                                    state["parking_uses"].__setitem__(i, {**state["parking_uses"][i], "use_type": e.value or ""}),
+                                    refresh_parking(),
+                                ),
                             ).classes("w-full")
-                            captured_idx = idx
-
-                            def _on_use_change(e, i=captured_idx) -> None:
-                                state["parking_uses"][i]["use_type"] = e.value or ""
-                                refresh_parking()
-
-                            sel.on("change", _on_use_change)
 
                         with ui.column().classes("col-3"):
                             ui.label("Building SF GFA").classes("text-caption text-grey-7")
-                            sf_inp = ui.input(
+                            ui.input(
                                 placeholder="e.g. 15000",
                                 value=row.get("building_sf", ""),
+                                on_change=lambda e, i=idx: (
+                                    state["parking_uses"].__setitem__(i, {**state["parking_uses"][i], "building_sf": e.value or ""}),
+                                    refresh_parking(),
+                                ),
                             ).classes("w-full")
-
-                            def _on_sf_change(e, i=captured_idx) -> None:
-                                state["parking_uses"][i]["building_sf"] = e.value or ""
-                                refresh_parking()
-
-                            sf_inp.on("change", _on_sf_change)
-                            sf_inp.on("keydown.enter", _on_sf_change)
 
                         with ui.column().classes("col-3"):
                             ui.label("Units / Seats / Beds").classes("text-caption text-grey-7")
-                            units_inp = ui.input(
+                            ui.input(
                                 placeholder="e.g. 24",
                                 value=row.get("num_units", ""),
+                                on_change=lambda e, i=idx: (
+                                    state["parking_uses"].__setitem__(i, {**state["parking_uses"][i], "num_units": e.value or ""}),
+                                    refresh_parking(),
+                                ),
                             ).classes("w-full")
-
-                            def _on_units_change(e, i=captured_idx) -> None:
-                                state["parking_uses"][i]["num_units"] = e.value or ""
-                                refresh_parking()
-
-                            units_inp.on("change", _on_units_change)
-                            units_inp.on("keydown.enter", _on_units_change)
 
                         with ui.column().classes("col-1 items-center"):
                             ui.label("").classes("text-caption")
-                            def _remove_row(i=captured_idx) -> None:
+                            def _remove_row(i=idx) -> None:
                                 state["parking_uses"].pop(i)
                                 _render_parking_rows()
                                 refresh_parking()
@@ -1045,7 +1077,7 @@ def _sir_textarea(label: str, key: str) -> None:
     with ui.column().classes("w-full q-mt-sm"):
         ui.label(label).classes("field-label")
         inp = ui.textarea(value=state.get(key, "")).props("outlined rows=5").classes("w-full sir-textarea")
-        inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+        inp.on("update:model-value", lambda e, k=key: state.__setitem__(k, e.args))
         ui_refs[key] = inp
 
 
@@ -1054,7 +1086,7 @@ def _sir_input(label: str, key: str, placeholder: str = "") -> None:
     with ui.column().classes("w-full q-mt-sm"):
         ui.label(label).classes("field-label")
         inp = ui.input(value=state.get(key, ""), placeholder=placeholder).props("outlined dense").classes("w-full")
-        inp.on("change", lambda e, k=key: state.__setitem__(k, e.value))
+        inp.on("update:model-value", lambda e, k=key: state.__setitem__(k, e.args))
         ui_refs[key] = inp
 
 
@@ -1206,16 +1238,72 @@ def render_tab_environmental() -> None:
                 _sir_input("Fire Route Considerations", "fire_route", "e.g. N/A")
 
 
-def _load_fees_data(county: str) -> dict:
-    """Load fees.json for the given county. Returns empty dict if not found."""
+def _load_fees_data(county: str, city: str = "") -> tuple:
+    """Load fees.json for the jurisdiction. Tries city-specific first, falls back to county.
+
+    Returns (fees_dict, source_label) where source_label describes which
+    jurisdiction the fees came from.
+    """
     import json, pathlib
+    from agents import city_slug as _cs
+
+    # Try city-specific first
+    if city:
+        slug = _cs(city)
+        if slug:
+            path = pathlib.Path(__file__).parent / "data" / slug / "fees.json"
+            if path.exists():
+                try:
+                    return json.loads(path.read_text(encoding="utf-8")), city
+                except Exception:
+                    pass
+
+    # Fall back to county
     path = pathlib.Path(__file__).parent / "data" / county.lower() / "fees.json"
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            label = f"{county} County"
+            if city:
+                label += f" (no city-specific fee data for {city})"
+            return data, label
         except Exception:
-            return {}
-    return {}
+            return {}, county
+    return {}, county
+
+
+def build_fees_schedule_text() -> str:
+    """Build a plain-text summary of the Fees & Schedule tab for Excel export."""
+    county = state.get("county", "Pinellas")
+    city = state.get("city", "")
+    fees, data_label = _load_fees_data(county, city)
+
+    if not fees:
+        if city:
+            return f"No fee data available for {city} or {county} County."
+        return f"No fee data available for {county} County."
+
+    lines: List[str] = [f"Showing fees for: {data_label}"]
+    source = fees.get("_source", "")
+    note = fees.get("_note", "")
+    if source:
+        lines.append(f"Source: {source}")
+    if note:
+        lines.append(f"Note: {note}")
+
+    for key in fees.get("_sections", list(FEE_SECTION_LABELS.keys())):
+        label = FEE_SECTION_LABELS.get(key, key.replace("_", " ").title())
+        content = (fees.get(key) or "").strip()
+        if not content:
+            continue
+        lines.append("")
+        lines.append(f"{label}:")
+        for line in content.split("\n"):
+            line = line.strip()
+            if line:
+                lines.append(f"- {line}")
+
+    return "\n".join(lines)
 
 
 def render_tab_fees_schedule() -> None:
@@ -1223,49 +1311,36 @@ def render_tab_fees_schedule() -> None:
     city = state.get("city", "")
     ui.label("Fees & Schedule").classes("text-h5 q-mb-md")
 
-    # Label lookup for fee section keys
-    _FEE_LABELS = {
-        "application_fees":   "Application & Permit Fees",
-        "impact_fees":        "Impact Fees",
-        "pre_app":            "Pre-Application Meeting",
-        "perm_steps":         "Permitting Steps",
-        "local_permits":      "Local Permitting (County / City)",
-        "wmd":                "SWFWMD Permitting",
-        "fdep":               "FDEP Permitting",
-        "fdot":               "FDOT Permitting",
-        "dedication":         "ROW Dedication / Easements",
-        "securities":         "Securities & Utility Connection Fees",
-        "coastal_dev_permit": "Coastal Development Permit",
-        "entitlements":       "Entitlements Process",
-        "lot_line":           "Lot Line / Subdivision",
-        "staff_meetings":     "Required Staff Meetings",
-        "public_meetings":    "Required Public Meetings",
-    }
-
     # Scrollable results area
     results_area = ui.column().classes("w-full gap-2")
 
     def do_fetch_fees() -> None:
         current_county = state.get("county", "Pinellas")
-        fees = _load_fees_data(current_county)
+        current_city = state.get("city", "")
+        fees, data_label = _load_fees_data(current_county, current_city)
         results_area.clear()
 
         if not fees:
             with results_area:
-                ui.label(f"No fee data available for {current_county} County.").classes("muted")
+                msg = f"No fee data available for {current_county} County"
+                if current_city:
+                    msg = f"No fee data available for {current_city} or {current_county} County"
+                ui.label(msg + ".").classes("muted")
             return
 
         source = fees.get("_source", "")
         note = fees.get("_note", "")
 
         with results_area:
+            # Show which jurisdiction's fees are displayed
+            ui.label(f"Showing fees for: {data_label}").classes("text-weight-bold text-primary q-mb-xs")
             if source:
                 ui.label(f"Source: {source}").classes("muted text-caption")
             if note:
                 ui.label(f"Note: {note}").classes("muted text-caption q-mb-sm")
 
-            for key in fees.get("_sections", list(_FEE_LABELS.keys())):
-                label = _FEE_LABELS.get(key, key.replace("_", " ").title())
+            for key in fees.get("_sections", list(FEE_SECTION_LABELS.keys())):
+                label = FEE_SECTION_LABELS.get(key, key.replace("_", " ").title())
                 content = fees.get(key, "")
                 if not content:
                     continue
@@ -1279,7 +1354,8 @@ def render_tab_fees_schedule() -> None:
                         else:
                             ui.label(line).classes("fee-line")
 
-    # Auto-load on tab open
+    # Auto-load on tab open and store callback for refresh
+    ui_refs["_fees_refresh"] = do_fetch_fees
     if state.get("county"):
         do_fetch_fees()
 
@@ -1303,6 +1379,17 @@ def generate_excel_report() -> None:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Site Data Report"
+
+    def _excel_safe(value: Any, max_len: int = 32000) -> str:
+        """Return text safe for Excel cells (strip control chars, cap length)."""
+        if value is None:
+            return ""
+        s = str(value)
+        # Excel/openpyxl rejects most ASCII control chars except tab/newline/carriage return.
+        s = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", s)
+        if len(s) > max_len:
+            s = s[:max_len] + "\n... [truncated]"
+        return s
 
     # ── Column widths ──
     ws.column_dimensions["A"].width = 40
@@ -1347,15 +1434,73 @@ def generate_excel_report() -> None:
 
     def write_field(label: str, value: Any) -> None:
         r = _next()
-        ca = ws.cell(row=r, column=1, value=label)
+        safe_label = _excel_safe(label, max_len=200)
+        safe_value = _excel_safe(value)
+        ca = ws.cell(row=r, column=1, value=safe_label)
         ca.font = _lbl_font
         ca.border = _btm_border
-        cb = ws.cell(row=r, column=2, value=str(value) if value else "")
+        cb = ws.cell(row=r, column=2, value=safe_value)
         cb.font = _val_font
         cb.border = _btm_border
         cb.alignment = _wrap_top
-        if value and "\n" in str(value):
-            ws.row_dimensions[r].height = max(15, str(value).count("\n") * 15 + 15)
+        if safe_value and "\n" in safe_value:
+            ws.row_dimensions[r].height = max(15, safe_value.count("\n") * 15 + 15)
+
+    def _clean_md(text: str) -> str:
+        """Convert markdown-ish text into readable plain text for Excel."""
+        if not text:
+            return ""
+        t = str(text)
+        t = t.replace("&nbsp;|&nbsp;", " | ")
+        t = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", r"\1 (\2)", t)
+        t = t.replace("**", "").replace("*", "")
+        return _excel_safe(t)
+
+    def write_analysis_sheet(sheet_name: str, title: str, content: str) -> None:
+        """Write auto-generated tab output to a dedicated worksheet."""
+        aws = wb.create_sheet(sheet_name[:31])
+        aws.column_dimensions["A"].width = 3
+        aws.column_dimensions["B"].width = 165
+
+        # Header
+        aws.merge_cells("A1:B1")
+        hc = aws.cell(row=1, column=1, value=title)
+        hc.font = _hdr_font
+        hc.fill = _hdr_fill
+        hc.alignment = _center
+
+        # Context row
+        aws.merge_cells("A2:B2")
+        ctx = aws.cell(
+            row=2,
+            column=1,
+            value=_excel_safe(f"County: {state.get('county', '')}    City: {state.get('city', '')}    Parcel: {state.get('parcel_id', '')}"),
+        )
+        ctx.font = Font(name="Calibri", size=10, color="2C3E50")
+        ctx.fill = PatternFill("solid", fgColor="EAF0F8")
+        ctx.alignment = Alignment(horizontal="left", vertical="center")
+
+        r = 4
+        for raw in _clean_md(content).splitlines():
+            line = raw.strip()
+            if not line or line == "---":
+                r += 1
+                continue
+
+            font = Font(name="Calibri", size=10, color="2C3E50")
+            if line.startswith("### "):
+                line = line[4:].strip()
+                font = Font(name="Calibri", bold=True, size=12, color="0B1F3A")
+            elif line.startswith("#### "):
+                line = line[5:].strip()
+                font = Font(name="Calibri", bold=True, size=11, color="1B3A6B")
+
+            cell = aws.cell(row=r, column=2, value=_excel_safe(line))
+            cell.font = font
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+            line_count = max(1, line.count("\n") + (len(line) // 120))
+            aws.row_dimensions[r].height = max(18, 15 * line_count)
+            r += 1
 
     # ── Report header ──
     write_header("DEVELOPMENT CODE LOOKUP REPORT")
@@ -1463,6 +1608,18 @@ def generate_excel_report() -> None:
     write_field("Required Staff Meetings", state.get("sched_staff_meetings", ""))
     write_field("Required Public Meetings", state.get("sched_public_meetings", ""))
 
+    # ── Generated analysis output moved to dedicated worksheets ──
+    write_section("AUTO-GENERATED TAB OUTPUTS")
+    write_field("Requirements Analysis", "See worksheet: Requirements Output")
+    write_field("Parking Analysis", "See worksheet: Parking Output")
+    write_field("Landscape Analysis", "See worksheet: Landscape Output")
+    write_field("Fees & Schedule", "See worksheet: Fees Output")
+
+    write_analysis_sheet("Requirements Output", "Requirements Analysis", build_requirements_markdown())
+    write_analysis_sheet("Parking Output", "Parking Analysis", build_parking_markdown())
+    write_analysis_sheet("Landscape Output", "Landscape Analysis", build_landscape_markdown())
+    write_analysis_sheet("Fees Output", "Fees & Schedule", build_fees_schedule_text())
+
     # ── Save ──
     reports_dir = pathlib.Path(__file__).parent / "reports"
     reports_dir.mkdir(exist_ok=True)
@@ -1471,7 +1628,80 @@ def generate_excel_report() -> None:
     filename = f"{pid}_{ts}.xlsx" if pid != "unknown" else f"report_{ts}.xlsx"
     out_path = reports_dir / filename
     wb.save(str(out_path))
-    ui.notify(f"Saved: reports\\{filename}", type="positive", timeout=8000)
+    try:
+        # Also trigger a browser download so users can pick a save location.
+        ui.download(str(out_path), filename=filename)
+    except Exception:
+        # Keep local file save even if browser download isn't available.
+        pass
+    ui.notify(f"Saved locally: {out_path.resolve()}", type="positive", timeout=10000)
+
+
+def export_excel_report() -> None:
+    """Safe export entrypoint: try formatted export, fall back to plain export."""
+    import pathlib
+    from datetime import datetime
+
+    try:
+        generate_excel_report()
+        return
+    except Exception as exc:
+        logger.exception("Formatted Excel export failed: %s", exc)
+
+    # Fallback export so users are never blocked.
+    try:
+        import openpyxl
+    except ImportError:
+        ui.notify("Excel export failed and openpyxl is not installed.", type="negative")
+        return
+
+    try:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Fallback Export"
+        ws.column_dimensions["A"].width = 36
+        ws.column_dimensions["B"].width = 120
+        ws.cell(row=1, column=1, value="Field")
+        ws.cell(row=1, column=2, value="Value")
+
+        r = 2
+        for k, v in state.items():
+            ws.cell(row=r, column=1, value=str(k))
+            ws.cell(row=r, column=2, value=str(v) if v is not None else "")
+            r += 1
+
+        # Add generated analysis text blocks.
+        for title, content in (
+            ("Requirements Output", build_requirements_markdown()),
+            ("Parking Output", build_parking_markdown()),
+            ("Landscape Output", build_landscape_markdown()),
+            ("Fees Output", build_fees_schedule_text()),
+        ):
+            ws.cell(row=r, column=1, value=title)
+            ws.cell(row=r, column=2, value=str(content) if content else "")
+            r += 1
+
+        reports_dir = pathlib.Path(__file__).parent / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        pid = (state.get("parcel_id") or "unknown").replace("-", "").replace(" ", "_")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{pid}_{ts}_fallback.xlsx" if pid != "unknown" else f"report_{ts}_fallback.xlsx"
+        out_path = reports_dir / filename
+        wb.save(str(out_path))
+
+        try:
+            ui.download(str(out_path), filename=filename)
+        except Exception:
+            pass
+
+        ui.notify(
+            f"Formatted export failed; fallback file saved locally: {out_path.resolve()}",
+            type="warning",
+            timeout=12000,
+        )
+    except Exception as exc:
+        logger.exception("Fallback Excel export failed: %s", exc)
+        ui.notify("Excel export failed. Check terminal logs for details.", type="negative", timeout=12000)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1624,7 +1854,7 @@ ui.label("Florida — Pinellas · Pasco · Hillsborough Counties · Land Develop
 with ui.row().classes("w-full items-center justify-between q-mb-sm"):
     ui.button(
         "EXPORT TO EXCEL",
-        on_click=generate_excel_report,
+        on_click=export_excel_report,
         icon="download",
         color="positive",
     ).props("outline").classes("export-btn")
