@@ -18,6 +18,7 @@ import math
 import os
 import re
 from typing import Any, Dict, List
+from urllib.parse import quote_plus
 
 from nicegui import ui, run
 
@@ -58,34 +59,41 @@ _env_agent = EnvironmentalAgent()
 
 def _build_parcel_links(county: str, parcel_id: str, address: str, city: str) -> List[Dict[str, str]]:
     """Return a list of {label, url} dicts for quick-access links relevant to the parcel."""
-    fema_query = f"{address} {city}".replace(" ", "%20")
+    fema_query = quote_plus(f"{address} {city}".strip())
     fema_url = f"https://msc.fema.gov/portal/search?AddressQuery={fema_query}#searchresultsanchor"
+    parcel_q = quote_plus(parcel_id.strip()) if parcel_id else ""
     links = []
     if county == "Pasco":
-        # Pasco County Property Appraiser
-        links.append({"label": "Property Appraiser", "url": f"https://pascopa.com/parcel/?parcelid={parcel_id}"})
-        # Pasco GIS / Parcel Map
-        links.append({"label": "Parcel Map (GIS)", "url": f"https://maps.pascopa.com/Html5Viewer/?viewer=pasco&find={parcel_id}"})
-        # Pasco Clerk of Court deed search
-        links.append({"label": "Deed / OR Records", "url": f"https://pascoclerk.com/official-records-search/?SearchType=parcel&Parcel={parcel_id}"})
-        # Pasco Development Services
-        links.append({"label": "Development Services", "url": "https://pascogov.com/developmentservices"})
+        # Use stable landing/search pages for reliability; old deep-links 404 frequently.
+        links.append({"label": "Property Appraiser", "url": "https://search.pascopa.com/"})
+        links.append({"label": "Parcel Map (GIS)", "url": "http://maps.pascopa.com/"})
+        links.append({"label": "Deed / OR Records", "url": "https://www.pascoclerk.com/"})
+        links.append({"label": "Development Services", "url": "https://www.pascocountyfl.gov/162/Development-Review"})
+        if parcel_q:
+            links.append({
+                "label": "Pasco Parcel Search",
+                "url": f"https://www.google.com/search?q=site%3Asearch.pascopa.com+{parcel_q}",
+            })
     elif county == "Hillsborough":
-        folio_digits = "".join(ch for ch in parcel_id if ch.isdigit())
-        links.append({"label": "Property Appraiser", "url": f"https://gis.hcpafl.org/propertysearch/#/nav/Search?folio={folio_digits}"})
-        links.append({"label": "Parcel Map (GIS)", "url": f"https://gis.hcpafl.org/propertysearch/#/nav/Basic%20Search?folio={folio_digits}"})
-        links.append({"label": "Deed / OR Records", "url": "https://www.hillsclerk.com/Additional-Services/Official-Records"})
-        links.append({"label": "Development Services", "url": "https://hcfl.gov/departments/development-services"})
+        links.append({"label": "Property Appraiser", "url": "https://gis.hcpafl.org/propertysearch/"})
+        links.append({"label": "Parcel Map (GIS)", "url": "https://gis.hcpafl.org/propertysearch/"})
+        links.append({"label": "Deed / OR Records", "url": "https://publicaccess.hillsclerk.com/oripublicaccess/"})
+        links.append({"label": "Development Services", "url": "https://hcfl.gov/"})
+        if parcel_q:
+            links.append({
+                "label": "Hillsborough Parcel Search",
+                "url": f"https://www.google.com/search?q=site%3Agis.hcpafl.org+propertysearch+{parcel_q}",
+            })
     elif county == "Pinellas":
-        # Pinellas County Property Appraiser
-        pid_clean = parcel_id.replace("-", "")
-        links.append({"label": "Property Appraiser", "url": f"https://www.pcpao.gov/general.php?parcel={pid_clean}"})
-        # Pinellas County GIS
-        links.append({"label": "Parcel Map (GIS)", "url": f"https://egis.pinellascounty.org/Html5Viewer/?viewer=pcgis&find={parcel_id}"})
-        # Pinellas Clerk of Court deed search
-        links.append({"label": "Deed / OR Records", "url": f"https://officialrecords.mypinellasclerk.org/search/SearchTypeParcel?ParcelID={pid_clean}"})
-        # Pinellas Building / DRS
-        links.append({"label": "Building & DRS", "url": "https://pinellascounty.org/build/"})
+        links.append({"label": "Property Appraiser", "url": "https://www.pcpao.gov/quick-search?qu=1"})
+        links.append({"label": "Parcel Map (GIS)", "url": "https://www.pcpao.gov/gis.html?v=5&home="})
+        links.append({"label": "Deed / OR Records", "url": "https://officialrecords.mypinellasclerk.org/"})
+        links.append({"label": "Building & DRS", "url": "https://pinellas.gov/building-and-development-review-services/"})
+        if parcel_q:
+            links.append({
+                "label": "Pinellas Parcel Search",
+                "url": f"https://www.google.com/search?q=site%3Apcpao.gov+{parcel_q}",
+            })
     else:
         # Unsupported counties: avoid showing incorrect county-specific links.
         county_q = county.replace(" ", "+")

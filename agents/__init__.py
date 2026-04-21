@@ -77,16 +77,16 @@ JURISDICTION_CODE_URLS: Dict[str, Dict[str, Any]] = {
     "pasco": {
         "label": "Pasco County",
         "zoning": {
-            "url": "https://library.municode.com/fl/pasco_county/codes/land_development_code?nodeId=PT5LADEDINGS500-522ZODISREGUA",
-            "section": "LDC Part 5 — Zoning Districts (Secs. 500–522)",
+            "url": "https://library.municode.com/fl/pasco_county/codes/land_development_code",
+            "section": "Pasco LDC — search 'Part 5' (Zoning Districts, Secs. 500-522)",
         },
         "parking": {
-            "url": "https://library.municode.com/fl/pasco_county/codes/land_development_code?nodeId=PT9SIDERE_S907OFPALORE",
-            "section": "LDC Sec. 907 — Off-Street Parking and Loading",
+            "url": "https://library.municode.com/fl/pasco_county/codes/land_development_code",
+            "section": "Pasco LDC — search 'Sec. 907' (Off-Street Parking and Loading)",
         },
         "landscape": {
-            "url": "https://library.municode.com/fl/pasco_county/codes/land_development_code?nodeId=PT9SIDERE_S904BULA",
-            "section": "LDC Sec. 904 — Buffers and Landscaping",
+            "url": "https://library.municode.com/fl/pasco_county/codes/land_development_code",
+            "section": "Pasco LDC — search 'Sec. 904' (Buffers and Landscaping)",
         },
         "flum": {
             "url": "https://pascofl.maps.arcgis.com/apps/webappviewer/index.html?id=7b5dd0eebec44af189e1b2b6b8e63c84",
