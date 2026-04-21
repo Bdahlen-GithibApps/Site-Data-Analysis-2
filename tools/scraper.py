@@ -23,6 +23,7 @@ from urllib3.util.retry import Retry
 _HILLSBOROUGH_PARCELS_URL = "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/HC_Parcels/FeatureServer/0/query"
 _HILLSBOROUGH_ZONING_URL = "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/Zoning/FeatureServer/0/query"
 _TAMPA_ZONING_URL = "https://arcgis.tampagov.net/arcgis/rest/services/OpenData/Planning/MapServer/28/query"
+_PLANT_CITY_ZONING_URL = "https://services2.arcgis.com/SauGyEuPWFNMB9BQ/arcgis/rest/services/Plant_City_Zoning/FeatureServer/0/query"
 _HILLSBOROUGH_FLUM_BASE = "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/Future_Land_Use_Element/FeatureServer"
 _HILLSBOROUGH_FLUM_LAYERS = [1, 2, 0, 3]  # Tampa, Temple Terrace, Plant City, Unincorporated
 
@@ -592,6 +593,21 @@ def _hillsborough_spatial_lookup(session: requests.Session, cx: float, cy: float
                 a = tfeats[0].get("attributes", {})
                 zoning_code = str(a.get("ZONECLASS") or "").strip()
                 zoning_desc = str(a.get("ZONEDESC") or "").strip()
+        except Exception:
+            pass
+
+    # Fallback: City of Plant City zoning layer (PCZONING field, code only)
+    if not zoning_code:
+        try:
+            rp = session.get(
+                _PLANT_CITY_ZONING_URL,
+                params={**params, "outFields": "PCZONING", "where": "1=1"},
+                timeout=15,
+            )
+            pfeats = rp.json().get("features", [])
+            if pfeats:
+                a = pfeats[0].get("attributes", {})
+                zoning_code = str(a.get("PCZONING") or "").strip()
         except Exception:
             pass
 
