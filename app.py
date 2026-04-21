@@ -26,7 +26,14 @@ from agents.landscape_agent import LandscapeAgent
 from agents.infrastructure_agent import InfrastructureAgent
 from agents.environmental_agent import EnvironmentalAgent
 from agents import get_code_urls, get_code_url
-from tools.scraper import scrape_pinellas_property, scrape_pasco_property, expand_city_name, lookup_dor_use_code, get_pinellas_adjacent_uses
+from tools.scraper import (
+    scrape_pinellas_property,
+    scrape_pasco_property,
+    scrape_hillsborough_property,
+    expand_city_name,
+    lookup_dor_use_code,
+    get_pinellas_adjacent_uses,
+)
 from tools.helpers import (
     safe_float,
     safe_int,
@@ -62,6 +69,12 @@ def _build_parcel_links(county: str, parcel_id: str, address: str, city: str) ->
         links.append({"label": "Deed / OR Records", "url": f"https://pascoclerk.com/official-records-search/?SearchType=parcel&Parcel={parcel_id}"})
         # Pasco Development Services
         links.append({"label": "Development Services", "url": "https://pascogov.com/developmentservices"})
+    elif county == "Hillsborough":
+        folio_digits = "".join(ch for ch in parcel_id if ch.isdigit())
+        links.append({"label": "Property Appraiser", "url": f"https://gis.hcpafl.org/propertysearch/#/nav/Search?folio={folio_digits}"})
+        links.append({"label": "Parcel Map (GIS)", "url": f"https://gis.hcpafl.org/propertysearch/#/nav/Basic%20Search?folio={folio_digits}"})
+        links.append({"label": "Deed / OR Records", "url": "https://www.hillsclerk.com/Additional-Services/Official-Records"})
+        links.append({"label": "Development Services", "url": "https://hcfl.gov/departments/development-services"})
     elif county == "Pinellas":
         # Pinellas County Property Appraiser
         pid_clean = parcel_id.replace("-", "")
@@ -664,11 +677,13 @@ def render_tab_lookup() -> None:
                         result = await run.io_bound(scrape_pasco_property, parcel_id)
                     elif county == "Pinellas":
                         result = await run.io_bound(scrape_pinellas_property, parcel_id)
+                    elif county == "Hillsborough":
+                        result = await run.io_bound(scrape_hillsborough_property, parcel_id)
                     else:
                         lookup_btn.enable()
                         ui.notify(
                             f"Parcel lookup is not yet implemented for {county} County. "
-                            "Use Pinellas or Pasco for automated parcel data, or enter fields manually.",
+                            "Use Pinellas, Pasco, or Hillsborough for automated parcel data, or enter fields manually.",
                             type="warning",
                             timeout=8000,
                         )
@@ -704,8 +719,8 @@ def render_tab_lookup() -> None:
                             ui_refs["tax_parcel"].value = pid_val
                             ui_refs["tax_parcel"].update()
 
-                    # For Pinellas, fetch adjacent uses (Pasco already in result)
-                    if county != "Pasco" and parcel_id and not state.get("adjoining_uses"):
+                    # For Pinellas, fetch adjacent uses if scraper did not already provide them.
+                    if county == "Pinellas" and parcel_id and not state.get("adjoining_uses"):
                         try:
                             ui.notify("Fetching adjacent parcel data...", type="info")
                             adj = await run.io_bound(get_pinellas_adjacent_uses, parcel_id)
@@ -717,12 +732,12 @@ def render_tab_lookup() -> None:
                         except Exception:
                             pass  # Adjacent lookup is best-effort
 
-                    # Expand city name (Pinellas only — uses abbreviation lookup)
+                    # Expand city abbreviation only for Pinellas tax-district values.
                     raw_city = result.get("city", "") or ""
-                    if county == "Pasco":
-                        state["city"] = raw_city  # Pasco returns full city name already
-                    else:
+                    if county == "Pinellas":
                         state["city"] = expand_city_name(raw_city)
+                    else:
+                        state["city"] = raw_city
                     if "city" in ui_refs:
                         ui_refs["city"].value = state["city"]
                         ui_refs["city"].update()
@@ -735,8 +750,8 @@ def render_tab_lookup() -> None:
                         ui_refs["land_use"].value = enriched
                         ui_refs["land_use"].update()
 
-                    # Auto-populate zoning + FLUM from spatial lookup (Pasco only)
-                    if county == "Pasco":
+                    # Auto-populate zoning + FLUM when the parcel scraper returns spatial codes.
+                    if county in ("Pasco", "Hillsborough"):
                         zoning_val = result.get("zoning", "") or ""
                         flu_val = result.get("future_land_use", "") or ""
                         zoning_desc = result.get("zoning_description", "") or ""

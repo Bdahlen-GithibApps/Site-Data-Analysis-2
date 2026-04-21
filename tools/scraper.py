@@ -20,6 +20,11 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+_HILLSBOROUGH_PARCELS_URL = "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/HC_Parcels/FeatureServer/0/query"
+_HILLSBOROUGH_ZONING_URL = "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/Zoning/FeatureServer/0/query"
+_HILLSBOROUGH_FLUM_BASE = "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/Future_Land_Use_Element/FeatureServer"
+_HILLSBOROUGH_FLUM_LAYERS = [1, 2, 0, 3]  # Tampa, Temple Terrace, Plant City, Unincorporated
+
 
 def _load_city_map() -> Dict[str, str]:
     path = Path(__file__).parent.parent / "data" / "pinellas" / "maps.json"
@@ -534,3 +539,145 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
         }
     except Exception as exc:
         return {"success": False, "error": f"Error querying Pasco ArcGIS: {str(exc)}"}
+
+
+def _hillsborough_folio_variants(parcel_id: str) -> tuple[str, str]:
+    digits = re.sub(r"[^0-9]", "", parcel_id or "")
+    folio = digits[:10] if len(digits) >= 10 else digits
+    dotted = f"{folio[:6]}.{folio[6:]}" if len(folio) == 10 else folio
+    return folio, dotted
+
+
+def _hillsborough_spatial_lookup(session: requests.Session, cx: float, cy: float) -> Dict[str, str]:
+    geom = json.dumps({"x": cx, "y": cy, "spatialReference": {"wkid": 2237}})
+    params = {
+        "geometry": geom,
+        "geometryType": "esriGeometryPoint",
+        "spatialRel": "esriSpatialRelIntersects",
+        "inSR": "2237",
+        "returnGeometry": "false",
+        "f": "json",
+    }
+
+    zoning_code = ""
+    zoning_desc = ""
+    flum_code = ""
+    flum_desc = ""
+
+    try:
+        rz = session.get(
+            _HILLSBOROUGH_ZONING_URL,
+            params={**params, "outFields": "NZONE,NZONE_DESC,LandDevCode,CATEGORY", "where": "1=1"},
+            timeout=15,
+        )
+        zfeats = rz.json().get("features", [])
+        if zfeats:
+            a = zfeats[0].get("attributes", {})
+            zoning_code = str(a.get("NZONE") or a.get("LandDevCode") or "").strip()
+            zoning_desc = str(a.get("NZONE_DESC") or a.get("CATEGORY") or "").strip()
+    except Exception:
+        pass
+
+    for layer_id in _HILLSBOROUGH_FLUM_LAYERS:
+        try:
+            rf = session.get(
+                f"{_HILLSBOROUGH_FLUM_BASE}/{layer_id}/query",
+                params={**params, "where": "1=1", "outFields": "FLUE,FLU_DESC,JURISDICTION"},
+                timeout=15,
+            )
+            ffeats = rf.json().get("features", [])
+            if not ffeats:
+                continue
+            a = ffeats[0].get("attributes", {})
+            flum_code = str(a.get("FLUE") or "").strip()
+            flum_desc = str(a.get("FLU_DESC") or "").strip()
+            if flum_code or flum_desc:
+                break
+        except Exception:
+            continue
+
+    return {
+        "zoning": zoning_code,
+        "zoning_description": zoning_desc,
+        "future_land_use": flum_code,
+        "flum_description": flum_desc,
+    }
+
+
+def scrape_hillsborough_property(parcel_id: str) -> Dict[str, Any]:
+    """Fetch parcel data from Hillsborough County ArcGIS, including zoning and FLUM where available."""
+    session = get_resilient_session()
+    folio, folio_dotted = _hillsborough_folio_variants(parcel_id)
+    if not folio:
+        return {"success": False, "error": "Enter a valid Hillsborough folio or parcel number."}
+
+    safe_folio = folio.replace(chr(39), chr(39) + chr(39))
+    safe_dotted = folio_dotted.replace(chr(39), chr(39) + chr(39))
+    where = f"FOLIO='{safe_folio}' OR FOLIO_NUMB='{safe_dotted}'"
+
+    try:
+        r = session.get(
+            _HILLSBOROUGH_PARCELS_URL,
+            params={
+                "where": where,
+                "outFields": "FOLIO,FOLIO_NUMB,OWNER,SITE_ADDR,SITE_CITY,SITE_ZIP,ACREAGE,DOR_CODE,LU_GRP",
+                "returnGeometry": "true",
+                "f": "json",
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+        d = r.json()
+        features = d.get("features", [])
+        if not features:
+            return {"success": False, "error": "Parcel not found in Hillsborough County records"}
+
+        feat = features[0]
+        a = feat.get("attributes", {})
+
+        folio_out = str(a.get("FOLIO") or folio).strip()
+        owner = str(a.get("OWNER") or "").strip()
+        street = str(a.get("SITE_ADDR") or "").strip()
+        city = str(a.get("SITE_CITY") or "").strip().title()
+        zip_code = str(a.get("SITE_ZIP") or "").strip()
+
+        if not city:
+            city = "Unincorporated Hillsborough"
+
+        address = ", ".join([p for p in [street, city, f"FL {zip_code}".strip()] if p]) if street else "No Physical Address"
+
+        acres_val = a.get("ACREAGE")
+        try:
+            acres = float(acres_val or 0)
+        except Exception:
+            acres = 0.0
+        acres_str = f"{acres:.2f}" if acres > 0 else ""
+        sqft_str = f"{int(round(acres * 43560)):,}" if acres > 0 else ""
+
+        dor_code = str(a.get("DOR_CODE") or "").strip()
+        dor_trim = dor_code[:3].zfill(3) if dor_code else ""
+        land_use = lookup_dor_use_code(dor_trim) if dor_trim else str(a.get("LU_GRP") or "").strip()
+
+        rings = (feat.get("geometry") or {}).get("rings", [[]])
+        pts = rings[0] if rings else []
+        spatial: Dict[str, str] = {}
+        if pts:
+            cx = sum(p[0] for p in pts) / len(pts)
+            cy = sum(p[1] for p in pts) / len(pts)
+            spatial = _hillsborough_spatial_lookup(session, cx, cy)
+
+        return {
+            "success": True,
+            "parcel_id": folio_out,
+            "owner": owner,
+            "address": address,
+            "city": city,
+            "zip": zip_code,
+            "land_use": land_use,
+            "site_area_sqft": sqft_str,
+            "site_area_acres": acres_str,
+            "adjoining_uses": "",
+            **spatial,
+        }
+    except Exception as exc:
+        return {"success": False, "error": f"Error querying Hillsborough ArcGIS: {str(exc)}"}
