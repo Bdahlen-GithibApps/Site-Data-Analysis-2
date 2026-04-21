@@ -4,15 +4,15 @@
 # WHERE TO RUN THIS:
 #   On your own computer. Open a terminal in this project folder and run:
 #       bash run.sh
-#   Then open  http://localhost:8080  in your browser.
+#   Then open  http://localhost:8081  in your browser.
 set -e
 
 echo "Installing dependencies..."
-pip install -r requirements.txt -q
+python -m pip install -r requirements.txt -q
 
 echo ""
 echo "============================================="
-echo "  App starting at  http://localhost:8080"
+echo "  App starting at  http://localhost:8081"
 echo "  Open that URL in your browser."
 echo "  Press Ctrl+C to stop."
 echo "============================================="
@@ -21,10 +21,10 @@ echo ""
 # Try to open the browser automatically (macOS / Linux desktop)
 if command -v open &>/dev/null; then
     # macOS
-    (sleep 3 && open http://localhost:8080) &
+    (sleep 3 && open http://localhost:8081) &
 elif command -v xdg-open &>/dev/null; then
     # Linux with a desktop environment
-    (sleep 3 && xdg-open http://localhost:8080) &
+    (sleep 3 && xdg-open http://localhost:8081) &
 fi
 
 python app.py

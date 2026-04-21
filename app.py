@@ -15,6 +15,7 @@ Run:
 from __future__ import annotations
 
 import math
+import os
 import re
 from typing import Any, Dict, List
 
@@ -1909,6 +1910,7 @@ with ui.tab_panels(tabs, value=tab1).classes("w-full"):
 
 ui.run(
     title="Dev Code Lookup",
+    host=os.getenv("APP_HOST", "0.0.0.0"),
     port=8081,
     show=False,
     reload=False,
