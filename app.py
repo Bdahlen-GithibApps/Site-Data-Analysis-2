@@ -1916,10 +1916,12 @@ with ui.tab_panels(tabs, value=tab1).classes("w-full"):
         with ui.card().classes("w-full tab-card"):
             render_tab_fees_schedule()
 
+app_port = int(os.getenv("PORT", os.getenv("APP_PORT", "8081")))
+
 ui.run(
     title="Dev Code Lookup",
     host=os.getenv("APP_HOST", "0.0.0.0"),
-    port=8081,
+    port=app_port,
     show=False,
     reload=False,
     reconnect_timeout=30,

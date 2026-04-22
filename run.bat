@@ -41,7 +41,8 @@ IF %ERRORLEVEL% NEQ 0 (
 echo.
 echo =============================================
 echo   App starting at  http://localhost:8081
-echo   For other workstations, use http://YOUR-IP:8081
+echo   Same-network sharing only: http://YOUR-IP:8081
+echo   For public sharing, run share_public.bat
 echo   Opening your browser automatically...
 echo   Press Ctrl+C (or close this window) to stop.
 echo =============================================

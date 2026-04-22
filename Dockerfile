@@ -6,5 +6,5 @@ COPY app.py .
 COPY agents/ ./agents/
 COPY tools/ ./tools/
 COPY data/ ./data/
-EXPOSE 8080
+EXPOSE 8081
 CMD ["python", "app.py"]
