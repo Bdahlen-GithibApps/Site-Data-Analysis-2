@@ -11,6 +11,7 @@ Extracted from app.py. Includes:
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Dict, Any
@@ -108,6 +109,54 @@ def get_resilient_session() -> requests.Session:
     return session
 
 
+def _centroid_from_rings(rings: list) -> tuple[float | None, float | None]:
+    """Return simple centroid (x, y) from first ring points."""
+    pts = rings[0] if rings else []
+    if not pts:
+        return None, None
+    cx = sum(p[0] for p in pts) / len(pts)
+    cy = sum(p[1] for p in pts) / len(pts)
+    return cx, cy
+
+
+def _web_mercator_to_wgs84(x: float, y: float) -> tuple[float, float]:
+    """Convert Web Mercator (EPSG:3857/102100) to (lat, lon) WGS84."""
+    lon = x / 20037508.342 * 180.0
+    lat = math.degrees(2.0 * math.atan(math.exp(y / 20037508.342 * math.pi)) - math.pi / 2.0)
+    return lat, lon
+
+
+def _pinellas_parcel_centroid_latlon(session: requests.Session, parcel_id: str) -> tuple[float | None, float | None]:
+    """Get Pinellas parcel centroid from county GIS parcel geometry in WKID 4326."""
+    base = "https://egis.pinellas.gov/gis/rest/services/PublicWebGIS/Parcels/MapServer/1/query"
+    digits = re.sub(r"[^0-9]", "", parcel_id)
+    dsp = parcel_id.strip()
+    where = (
+        f"PARCELID_DSP1='{dsp}' OR PARCELID_DSP2='{dsp}'"
+        + (f" OR STRAP='{digits}' OR PARCELID='{digits}'" if digits else "")
+    )
+    try:
+        r = session.get(
+            base,
+            params={
+                "where": where,
+                "outFields": "PARCELID",
+                "returnGeometry": "true",
+                "outSR": "4326",
+                "f": "json",
+            },
+            timeout=15,
+        )
+        feats = r.json().get("features", [])
+        if not feats:
+            return None, None
+        rings = (feats[0].get("geometry") or {}).get("rings", [])
+        lon, lat = _centroid_from_rings(rings)
+        return lat, lon
+    except Exception:
+        return None, None
+
+
 def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
     session = get_resilient_session()
     url = "https://www.pcpao.gov/dal/quicksearch/searchProperty"
@@ -189,6 +238,8 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
         except Exception:
             pass
 
+        lat, lon = _pinellas_parcel_centroid_latlon(session, normalized_parcel)
+
         return {
             "success": True,
             "parcel_id": normalized_parcel,
@@ -202,6 +253,8 @@ def scrape_pinellas_property(parcel_id: str) -> Dict[str, Any]:
             "legal_description": legal_desc,
             "strap": strap or "",
             "tax_district": tax_district,
+            "lat": lat,
+            "lon": lon,
         }
     except Exception as exc:
         return {"success": False, "error": f"Error querying PCPAO API: {str(exc)}"}
@@ -483,11 +536,10 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
 
         # Compute centroid from geometry (needed for spatial lookups + city fallback)
         rings = (feat.get("geometry") or {}).get("rings", [[]])
-        pts = rings[0] if rings else []
-        cx = cy = None
-        if pts:
-            cx = sum(p[0] for p in pts) / len(pts)
-            cy = sum(p[1] for p in pts) / len(pts)
+        cx, cy = _centroid_from_rings(rings)
+        lat = lon = None
+        if cx is not None and cy is not None:
+            lat, lon = _web_mercator_to_wgs84(cx, cy)
 
         # Vacant land often has no PHYS_CITY — use Census reverse geocoder to fill it
         if (not city or not zip_code) and cx is not None:
@@ -537,6 +589,8 @@ def scrape_pasco_property(parcel_id: str) -> Dict[str, Any]:
             "site_area_sqft": "",
             "site_area_acres": acres_str,
             "adjoining_uses": adj_uses,
+            "lat": lat,
+            "lon": lon,
             **spatial,
         }
     except Exception as exc:
@@ -692,12 +746,32 @@ def scrape_hillsborough_property(parcel_id: str) -> Dict[str, Any]:
         land_use = lookup_dor_use_code(dor_trim) if dor_trim else str(a.get("LU_GRP") or "").strip()
 
         rings = (feat.get("geometry") or {}).get("rings", [[]])
-        pts = rings[0] if rings else []
         spatial: Dict[str, str] = {}
-        if pts:
-            cx = sum(p[0] for p in pts) / len(pts)
-            cy = sum(p[1] for p in pts) / len(pts)
+        cx, cy = _centroid_from_rings(rings)
+        lat = lon = None
+        if cx is not None and cy is not None:
             spatial = _hillsborough_spatial_lookup(session, cx, cy)
+
+        # Get WGS84 centroid from the same folio geometry to drive parcel-accurate
+        # environmental/infrastructure lookups (instead of address geocoding).
+        try:
+            r4326 = session.get(
+                _HILLSBOROUGH_PARCELS_URL,
+                params={
+                    "where": where,
+                    "outFields": "FOLIO",
+                    "returnGeometry": "true",
+                    "outSR": "4326",
+                    "f": "json",
+                },
+                timeout=15,
+            )
+            feats4326 = r4326.json().get("features", [])
+            if feats4326:
+                rings4326 = (feats4326[0].get("geometry") or {}).get("rings", [])
+                lon, lat = _centroid_from_rings(rings4326)
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -710,6 +784,8 @@ def scrape_hillsborough_property(parcel_id: str) -> Dict[str, Any]:
             "site_area_sqft": sqft_str,
             "site_area_acres": acres_str,
             "adjoining_uses": "",
+            "lat": lat,
+            "lon": lon,
             **spatial,
         }
     except Exception as exc:

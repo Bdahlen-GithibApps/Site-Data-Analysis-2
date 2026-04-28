@@ -117,6 +117,8 @@ state: Dict[str, Any] = {
     "address": "",
     "city": "",
     "zip": "",
+    "lat": None,
+    "lon": None,
     "owner": "",
     "land_use": "",
     "site_area_acres": "",
@@ -720,6 +722,10 @@ def render_tab_lookup() -> None:
                             ui_refs[state_key].value = val
                             ui_refs[state_key].update()
 
+                    # Persist parcel-derived coordinates for downstream spatial lookups.
+                    state["lat"] = result.get("lat")
+                    state["lon"] = result.get("lon")
+
                     # Auto-fill Tax Parcel ID from lookup result
                     pid_val = result.get("parcel_id", "") or ""
                     if pid_val:
@@ -835,6 +841,8 @@ def render_tab_lookup() -> None:
                         state.get("city", ""),
                         state.get("zip", ""),
                         state.get("county", "Pinellas"),
+                        state.get("lat"),
+                        state.get("lon"),
                     )
                     if not infra_result.get("error"):
                         for key, value in infra_result.items():
@@ -855,6 +863,8 @@ def render_tab_lookup() -> None:
                         state.get("city", ""),
                         state.get("zip", ""),
                         state.get("county", "Pinellas"),
+                        state.get("lat"),
+                        state.get("lon"),
                     )
                     flood_zone = env_result.pop("_flood_zone", "")
                     if not env_result.get("error"):
@@ -1125,6 +1135,8 @@ def render_tab_infrastructure() -> None:
             city = state.get("city", "").strip()
             zip_code = state.get("zip", "").strip()
             county = state.get("county", "Pinellas")
+            lat = state.get("lat")
+            lon = state.get("lon")
 
             if not address:
                 ui.notify("Look up a property first to populate the address.", type="warning")
@@ -1133,7 +1145,7 @@ def render_tab_infrastructure() -> None:
             infra_status.text = "Querying GIS services…"
             infra_status.update()
 
-            result = _infra_agent.lookup(address, city, zip_code, county)
+            result = _infra_agent.lookup(address, city, zip_code, county, lat, lon)
 
             if result.get("error"):
                 ui.notify(result["error"], type="negative")
@@ -1205,12 +1217,14 @@ def render_tab_environmental() -> None:
             city = state.get("city", "").strip()
             zip_code = state.get("zip", "").strip()
             county = state.get("county", "Pinellas")
+            lat = state.get("lat")
+            lon = state.get("lon")
             if not address:
                 ui.notify("Look up a property first to populate the address.", type="warning")
                 return
             env_status.text = f"Querying FEMA and {county} County GIS..."
             env_status.update()
-            result = _env_agent.lookup(address, city, zip_code, county)
+            result = _env_agent.lookup(address, city, zip_code, county, lat, lon)
             flood_zone = result.pop("_flood_zone", "")
             if result.get("error"):
                 ui.notify(result["error"], type="negative")
