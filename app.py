@@ -675,6 +675,51 @@ PARKING_REQUIREMENTS = {
 
 
 # ──────────────────────────────────────────────────────────────────────
+# PASCO COUNTY PARKING REQUIREMENTS (Pasco County LDC Sec. 905.1)
+# Verify current requirements against the official Pasco County Land
+# Development Code before submitting site plans.
+# ──────────────────────────────────────────────────────────────────────
+
+PASCO_PARKING_REQUIREMENTS = {
+    # Residential
+    "Single Family Detached": {"min_rate": "2 per dwelling unit", "min_per_unit": 2.0, "unit": "dwelling unit", "max_limit": None},
+    "Single Family Attached": {"min_rate": "2 per dwelling unit", "min_per_unit": 2.0, "unit": "dwelling unit", "max_limit": None},
+    "Duplex": {"min_rate": "2 per dwelling unit", "min_per_unit": 2.0, "unit": "dwelling unit", "max_limit": None},
+    "Multi-Family (Studio/1BR)": {"min_rate": "1.5 per dwelling unit", "min_per_unit": 1.5, "unit": "dwelling unit", "max_limit": None},
+    "Multi-Family (2+ BR)": {"min_rate": "2 per dwelling unit", "min_per_unit": 2.0, "unit": "dwelling unit", "max_limit": None},
+    "ALF / Group Home": {"min_rate": "0.5 per bed/resident", "min_per_unit": 0.5, "unit": "bed", "max_limit": None},
+
+    # Office
+    "Office (General)": {"min_rate": "1 per 300 sf GFA (3.33 per 1,000 sf)", "min_per_unit": 3.33, "unit": "1,000 sf GFA", "max_limit": None},
+    "Office (Medical/Dental)": {"min_rate": "1 per 200 sf GFA (5 per 1,000 sf)", "min_per_unit": 5.0, "unit": "1,000 sf GFA", "max_limit": None},
+
+    # Retail / Commercial
+    "Retail (General)": {"min_rate": "1 per 250 sf GFA (4 per 1,000 sf)", "min_per_unit": 4.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Shopping Center": {"min_rate": "1 per 200 sf GFA (5 per 1,000 sf)", "min_per_unit": 5.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Restaurant (Sit-down)": {"min_rate": "1 per 100 sf GFA (10 per 1,000 sf)", "min_per_unit": 10.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Restaurant (Fast Food)": {"min_rate": "1 per 75 sf GFA (~13 per 1,000 sf)", "min_per_unit": 13.3, "unit": "1,000 sf GFA", "max_limit": None},
+    "Convenience Store": {"min_rate": "1 per 200 sf GFA (5 per 1,000 sf)", "min_per_unit": 5.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Hotel/Motel": {"min_rate": "1 per guest room", "min_per_unit": 1.0, "unit": "guest room", "max_limit": None},
+
+    # Industrial / Employment
+    "Warehouse/Storage": {"min_rate": "1 per 1,000 sf GFA", "min_per_unit": 1.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Light Manufacturing": {"min_rate": "1 per 500 sf GFA (2 per 1,000 sf)", "min_per_unit": 2.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Self-Storage": {"min_rate": "1 per 50 units + 2 for office", "min_per_unit": 0.02, "unit": "unit", "max_limit": None},
+
+    # Institutional
+    "Church/Place of Worship": {"min_rate": "1 per 4 seats in main assembly", "min_per_unit": 0.25, "unit": "seat", "max_limit": None},
+    "School (Elementary/Middle)": {"min_rate": "2 per classroom", "min_per_unit": 2.0, "unit": "classroom", "max_limit": None},
+    "School (High School)": {"min_rate": "5 per classroom", "min_per_unit": 5.0, "unit": "classroom", "max_limit": None},
+    "Day Care": {"min_rate": "1 per 8 children capacity + 1 per employee", "min_per_unit": None, "unit": "special", "max_limit": None},
+    "Hospital": {"min_rate": "1 per 2 beds", "min_per_unit": 0.5, "unit": "bed", "max_limit": None},
+
+    # Recreation
+    "Fitness/Health Club": {"min_rate": "1 per 200 sf GFA (5 per 1,000 sf)", "min_per_unit": 5.0, "unit": "1,000 sf GFA", "max_limit": None},
+    "Marina": {"min_rate": "0.5 per wet slip + 0.25 per dry slip", "min_per_unit": 0.5, "unit": "wet slip", "max_limit": None},
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
 # ADA ACCESSIBLE PARKING (Table 338-3602.c)
 # Per ADA / Florida Building Code
 # ──────────────────────────────────────────────────────────────────────
@@ -739,9 +784,11 @@ def get_flum_requirements(flum_code: str) -> Optional[dict]:
     return FLUM_CATEGORIES.get(code)
 
 
-def get_parking_rate(use_type: str) -> Optional[dict]:
-    """Look up parking rate for a use type."""
-    return PARKING_REQUIREMENTS.get(use_type)
+def get_parking_rate(use_type: str, county: Optional[str] = None) -> Optional[dict]:
+    """Look up parking rate for a use type using the county-appropriate table."""
+    effective_county = county or state.get("county", "Pinellas")
+    tbl = PASCO_PARKING_REQUIREMENTS if effective_county == "Pasco" else PARKING_REQUIREMENTS
+    return tbl.get(use_type)
 
 
 PINELLAS_CITY_MAP = {
@@ -1206,16 +1253,18 @@ def build_parking_markdown() -> str:
     use_type = state.get("use_type", "")
     building_sf = safe_float(state.get("building_sf"))
     num_units = safe_int(state.get("num_units"))
+    county = state.get("county", "Pinellas")
 
     if not use_type:
         return "*Select a proposed use type to calculate parking requirements.*"
 
-    rate = PARKING_REQUIREMENTS.get(use_type)
+    parking_table = PASCO_PARKING_REQUIREMENTS if county == "Pasco" else PARKING_REQUIREMENTS
+    rate = parking_table.get(use_type)
     if not rate:
         return f"⚠️ Use type **{use_type}** not found in parking tables."
 
     lines: List[str] = []
-    lines.append(f"### Parking Analysis — {use_type}")
+    lines.append(f"### Parking Analysis — {use_type} ({county} County)")
     lines.append(f"**Rate:** {rate['min_rate']}")
     if rate.get("max_limit"):
         lines.append(f"**Maximum:** {rate['max_limit']}")
@@ -1259,7 +1308,8 @@ def build_parking_markdown() -> str:
     lines.append("")
 
     # Stall dimensions
-    lines.append("**Stall Dimensions (Table 138-3602.d):**")
+    stall_ref = "Pasco County LDC Ch. 905" if county == "Pasco" else "Table 138-3602.d"
+    lines.append(f"**Stall Dimensions ({stall_ref}):**")
     lines.append("")
     lines.append("| Layout | Stall | Aisle |")
     lines.append("|--------|-------|-------|")
@@ -1270,7 +1320,11 @@ def build_parking_markdown() -> str:
     lines.append("| ADA | 12' × 18' | — |")
     lines.append("")
     lines.append("---")
-    lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
+    if county == "Pasco":
+        lines.append("**Code References:** Sec. 905.1 — Off-Street Parking Requirements · Pasco County Land Development Code  ")
+        lines.append("*Verify all requirements against the current Pasco County LDC before submitting site plans.*")
+    else:
+        lines.append("**Code References:** Sec. 138-3602 — Motor Vehicle Parking · Sec. 138-3603 — Bicycle Parking")
 
     return "\n".join(lines)
 
@@ -1334,7 +1388,10 @@ def render_tab_lookup() -> None:
                     ui_refs["parcel_id_input"] = parcel_input
                     ui_refs["county_input"] = county_input
                     parcel_input.on("change", lambda e: state.__setitem__("parcel_id", e.value))
-                    county_input.on("change", lambda e: state.__setitem__("county", e.value))
+                    def on_county_change(e):
+                        state["county"] = e.value
+                        refresh_all()
+                    county_input.on("change", on_county_change)
 
                 def do_lookup() -> None:
                     parcel_id = (parcel_input.value or state.get("parcel_id") or "").strip()
@@ -1476,7 +1533,8 @@ def render_tab_lookup() -> None:
             with ui.card().classes("section-card q-mt-md w-full"):
                 ui.label("Parking Input").classes("section-title")
 
-                use_options = {k: k for k in PARKING_REQUIREMENTS.keys()}
+                all_use_types = sorted(set(PARKING_REQUIREMENTS.keys()) | set(PASCO_PARKING_REQUIREMENTS.keys()))
+                use_options = {k: k for k in all_use_types}
                 use_select = labeled_select(
                     "Proposed Use Type",
                     use_options,
