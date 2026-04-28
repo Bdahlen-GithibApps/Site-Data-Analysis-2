@@ -4,6 +4,25 @@ Single-file NiceGUI app for parcel-driven development requirements lookup — un
 
 ## Run
 
+### Windows
+
+Double-click **`run.bat`** — it installs dependencies and opens the app automatically.
+
+Or from a command prompt in the project folder:
+
+```bat
+run.bat
+```
+
+To upgrade to the latest NiceGUI portal and all packages before running:
+
+```bat
+update.bat
+```
+Then run `run.bat` as normal.
+
+### Mac / Linux
+
 ```bash
 pip install -r requirements.txt
 python app.py
@@ -30,6 +49,8 @@ docker run -p 8080:8080 devcode
 app.py              # The entire app (everything in one file)
 requirements.txt    # nicegui, requests, beautifulsoup4
 Dockerfile          # Single container
+run.bat             # Windows launcher (install + run)
+update.bat          # Windows updater (upgrade to latest packages)
 .gitignore
 README.md
 ```
