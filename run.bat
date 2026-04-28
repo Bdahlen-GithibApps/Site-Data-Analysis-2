@@ -1,5 +1,5 @@
 @echo off
-echo Installing dependencies...
+echo Installing / upgrading to latest dependencies...
 pip install -r requirements.txt
 if errorlevel 1 (
     echo Failed to install dependencies. Make sure Python and pip are installed.
